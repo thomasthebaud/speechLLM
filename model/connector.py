@@ -2,11 +2,13 @@ import torch
 from torch import nn
 
 
-def get_connector(name, audio_enc_dim, llm_dim, k):
+def get_connector(name, audio_enc_dim, llm_dim, k, dim):
     if name == 'linear-pool':
         return LinearPoolConnector(audio_enc_dim, llm_dim, k)
     elif name == 'linear':
         return LinearConnector(audio_enc_dim, llm_dim, k)
+    elif name == 'mlp':
+        return LinearConnector(audio_enc_dim, llm_dim, k, dim)
     elif name == 'cnn':
         return CNNConnector(audio_enc_dim, llm_dim, k)
     else:
@@ -25,6 +27,21 @@ class LinearConnector(nn.Module):
         x = x.transpose(1, 2)
         return x
 
+class MLPConnector(nn.Module):
+    def __init__(self, in_dim, out_dim, k, dim):
+        super().__init__()
+        if k==1: self.layer = nn.Linear(in_dim, out_dim)
+        elif k==2: 
+            self.layer = nn.Sequential(
+          nn.Linear(in_dim, dim),
+          nn.ReLU(),
+          nn.Linear(dim, out_dim),
+        )
+        # self.pool = nn.AvgPool1d(kernel_size=k, stride=k)
+
+    def forward(self, x):
+        x = self.layer(x)
+        return x
 
 class LinearPoolConnector(nn.Module):
     def __init__(self, input_dim, output_dim, k):

@@ -12,7 +12,7 @@ import random
 import re
 import json
 
-from model.encoder import get_audio_encoder, TransformerAudioEnoder
+from model.encoder import get_audio_encoder, TransformerAudioEncoder
 from model.connector import get_connector, LinearConnector, LinearPoolConnector, CNNConnector
 from model.llm import get_llm
 
@@ -25,6 +25,7 @@ class SpeechLLMLightning(pl.LightningModule):
                  llm_name="TinyLlama/TinyLlama-1.1B-Chat-v1.0", 
                  finetune_encoder=False,
                  connector_k=5,
+                 connector_dim=512,
                  use_lora=True,
                  lora_r=32,
                  lora_alpha=2,
@@ -43,7 +44,7 @@ class SpeechLLMLightning(pl.LightningModule):
         self.use_lora = use_lora
 
         self.audio_encoder = get_audio_encoder(audio_encoder_name, finetune_encoder)
-        self.connector = get_connector(connector_name, audio_enc_dim, llm_dim, connector_k)
+        self.connector = get_connector(connector_name, audio_enc_dim, llm_dim, connector_k, connector_dim)
         self.llm_tokenizer, self.llm_model = get_llm(llm_name, use_lora, lora_r, lora_alpha)
         
         self.max_lr = max_lr
@@ -89,13 +90,24 @@ class SpeechLLMLightning(pl.LightningModule):
             labels=label_ids,
         )
         return out
+
+    def generate(self, embeds, max_new_tokens=1024):
+        out = self.llm_model.generate(
+            inputs_embeds=embeds,
+            max_new_tokens=max_new_tokens,
+        )
+        return out
     
     def training_step(self, batch, batch_idx):
+        # self.log({
+        # "cuda_mem_allocated_MB": torch.cuda.memory_allocated() / 1024**2,
+        # "cuda_mem_reserved_MB": torch.cuda.memory_reserved() / 1024**2,
+        # }, step=batch_idx)
         mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids = batch
         embeds, atts, label_ids = self.encode(mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids)
         outputs = self.forward(embeds, atts, label_ids)
         loss =  outputs["loss"]
-        self.log("train/loss", loss, on_epoch=False)
+        self.log("train/loss", loss, on_epoch=False, on_step=True, sync_dist=True)
         return loss
     
     def validation_step(self, batch, batch_idx):
@@ -103,10 +115,12 @@ class SpeechLLMLightning(pl.LightningModule):
             embeds, atts, label_ids = self.encode(mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids)
             outputs = self.forward(embeds, atts, label_ids)
             loss = outputs["loss"]
-            self.log("val/loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+            self.log("val/loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
             
-            logits = outputs.logits
-            predicted_ids = torch.argmax(logits, dim=-1).cpu()
+            # logits = outputs.logits
+            # predicted_ids = torch.argmax(logits, dim=-1).cpu()
+
+            predicted_ids = self.generate(embeds=embeds).cpu()
 
             generated_output_text = self.llm_tokenizer.decode(predicted_ids[0], skip_special_tokens=False)
             target_text = self.llm_tokenizer.decode(output_tokenized_ids[0], skip_special_tokens=False)
@@ -114,49 +128,7 @@ class SpeechLLMLightning(pl.LightningModule):
             extracted_pred = self.extract_prediction_values(generated_output_text)
             extracted_target = self.extract_prediction_values(target_text)
 
-            keys = extracted_target.keys()
-            pred_keys = extracted_pred.keys()
-
-            for key in keys:
-                if key not in pred_keys:
-                    extracted_pred[key] = "NA"
-
-            if 'Transcript' in keys:
-                target_transcript = extracted_target['Transcript']
-                predicted_transcript = extracted_pred['Transcript']
-                wer_metric = wer(target_transcript.lower(), predicted_transcript.lower())
-                self.log("val/wer", wer_metric, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-
-            if 'Response' in keys:
-                target_transcript = extracted_target['Response']
-                predicted_transcript = extracted_pred['Response']
-                wer_metric = wer(target_transcript.lower(), predicted_transcript.lower())
-                self.log("val/response_wer", wer_metric, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-
-            if 'SpeechActivity' in keys:
-                target_isspeech = extracted_target['SpeechActivity']
-                predicted_isspeech = extracted_pred['SpeechActivity']
-                self.log("val/speech_activity", float(target_isspeech.lower()==predicted_isspeech.lower()), on_step=False, on_epoch=True, prog_bar=True, logger=True)
-
-            if 'Gender' in keys:
-                target_gender = extracted_target['Gender']
-                predicted_gender = extracted_pred['Gender']
-                self.log("val/gender", float(target_gender.lower()==predicted_gender.lower()), on_step=False, on_epoch=True, prog_bar=True, logger=True)
-
-            if 'Emotion' in keys:
-                target_emotion = extracted_target['Emotion']
-                predicted_emotion = extracted_pred['Emotion']
-                self.log("val/emotion", float(target_emotion.lower()==predicted_emotion.lower()), on_step=False, on_epoch=True, prog_bar=True, logger=True)
-
-            if 'Age' in keys:
-                target_age = extracted_target['Age']
-                predicted_age = extracted_pred['Age']
-                self.log("val/age", float(target_age.lower()==predicted_age.lower()), on_step=False, on_epoch=True, prog_bar=True, logger=True)
-
-            if 'Accent' in keys:
-                target_accent = extracted_target['Accent']
-                predicted_accent = extracted_pred['Accent']
-                self.log("val/accent", float(target_accent.lower()==predicted_accent.lower()), on_step=False, on_epoch=True, prog_bar=True, logger=True)
+            self.get_keys_and_log(extracted_pred, extracted_target, v='val')
 
             if batch_idx in self.selected_samples_for_logging:
                 sample_idx = self.selected_samples_for_logging.index(batch_idx)
@@ -172,66 +144,70 @@ class SpeechLLMLightning(pl.LightningModule):
     def test_step(self, batch, batch_idx):
             mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids = batch
             embeds, atts, label_ids = self.encode(mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids)
-            outputs = self.forward(embeds, atts, label_ids)
-            loss = outputs["loss"]
-            self.log("val/loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+            predicted_ids = self.generate(inputs_embeds=embeds).cpu()
+            # loss = outputs["loss"]
+            # self.log("val/loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True)
             
-            logits = outputs.logits
-            predicted_ids = torch.argmax(logits, dim=-1)
+            # logits = outputs.logits
+            # predicted_ids = torch.argmax(logits, dim=-1)
 
             input_token_length = output_tokenized_ids.shape[1]
             generated_output_text = self.llm_tokenizer.decode(predicted_ids[0], skip_special_tokens=False)
             target_text = self.llm_tokenizer.decode(output_tokenized_ids[0], skip_special_tokens=False)
-            
+
             extracted_pred = self.extract_prediction_values(generated_output_text)
             extracted_target = self.extract_prediction_values(target_text)
 
-            keys = extracted_target.keys()
-            pred_keys = extracted_pred.keys()
-
-            for key in keys:
-                if key not in pred_keys:
-                    extracted_pred[key] = "NA"
-
-            if 'Transcript' in keys:
-                target_transcript = extracted_target['Transcript']
-                predicted_transcript = extracted_pred['Transcript']
-                wer_metric = wer(target_transcript.lower(), predicted_transcript.lower())
-                self.log("val/wer", wer_metric, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-
-            if 'Response' in keys:
-                target_transcript = extracted_target['Response']
-                predicted_transcript = extracted_pred['Response']
-                wer_metric = wer(target_transcript.lower(), predicted_transcript.lower())
-                self.log("val/response_wer", wer_metric, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-
-            if 'SpeechActivity' in keys:
-                target_isspeech = extracted_target['SpeechActivity']
-                predicted_isspeech = extracted_pred['SpeechActivity']
-                self.log("val/speech_activity", float(target_isspeech.lower()==predicted_isspeech.lower()), on_step=False, on_epoch=True, prog_bar=True, logger=True)
-
-            if 'Gender' in keys:
-                target_gender = extracted_target['Gender']
-                predicted_gender = extracted_pred['Gender']
-                self.log("val/gender", float(target_gender.lower()==predicted_gender.lower()), on_step=False, on_epoch=True, prog_bar=True, logger=True)
-
-            if 'Emotion' in keys:
-                target_emotion = extracted_target['Emotion']
-                predicted_emotion = extracted_pred['Emotion']
-                self.log("val/emotion", float(target_emotion.lower()==predicted_emotion.lower()), on_step=False, on_epoch=True, prog_bar=True, logger=True)
-
-            if 'Age' in keys:
-                target_age = extracted_target['Age']
-                predicted_age = extracted_pred['Age']
-                self.log("val/age", float(target_age.lower()==predicted_age.lower()), on_step=False, on_epoch=True, prog_bar=True, logger=True)
-
-            if 'Accent' in keys:
-                target_accent = extracted_target['Accent']
-                predicted_accent = extracted_pred['Accent']
-                self.log("val/accent", float(target_accent.lower()==predicted_accent.lower()), on_step=False, on_epoch=True, prog_bar=True, logger=True)
+            self.get_keys_and_log(extracted_pred, extracted_target, v='test')
 
             return {"val_loss": loss}
     
+    def get_keys_and_log(self, extracted_pred, extracted_target, v='val'):
+
+        keys = extracted_target.keys()
+        pred_keys = extracted_pred.keys()
+
+        for key in keys:
+            if key not in pred_keys:
+                extracted_pred[key] = "NA"
+
+        if 'Transcript' in keys:
+            target_transcript = extracted_target['Transcript']
+            predicted_transcript = extracted_pred['Transcript']
+            wer_metric = wer(target_transcript.lower(), predicted_transcript.lower())
+            self.log(f"{v}/wer", wer_metric, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+
+        if 'Response' in keys:
+            target_transcript = extracted_target['Response']
+            predicted_transcript = extracted_pred['Response']
+            wer_metric = wer(target_transcript.lower(), predicted_transcript.lower())
+            self.log(f"{v}/response_wer", wer_metric, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+
+        if 'SpeechActivity' in keys:
+            target_isspeech = extracted_target['SpeechActivity']
+            predicted_isspeech = extracted_pred['SpeechActivity']
+            self.log(f"{v}/speech_activity", float(target_isspeech.lower()==predicted_isspeech.lower()), on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+
+        if 'Gender' in keys:
+            target_gender = extracted_target['Gender']
+            predicted_gender = extracted_pred['Gender']
+            self.log(f"{v}/gender", float(target_gender.lower()==predicted_gender.lower()), on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+
+        if 'Emotion' in keys:
+            target_emotion = extracted_target['Emotion']
+            predicted_emotion = extracted_pred['Emotion']
+            self.log(f"{v}/emotion", float(target_emotion.lower()==predicted_emotion.lower()), on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+
+        if 'Age' in keys:
+            target_age = extracted_target['Age']
+            predicted_age = extracted_pred['Age']
+            self.log(f"{v}/age", float(target_age.lower()==predicted_age.lower()), on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+
+        if 'Accent' in keys:
+            target_accent = extracted_target['Accent']
+            predicted_accent = extracted_pred['Accent']
+            self.log(f"{v}/accent", float(target_accent.lower()==predicted_accent.lower()), on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+
     def on_validation_epoch_start(self):
         """Select two random validation samples to log for each epoch."""
         self.selected_samples_for_logging = random.sample(range(self.num_validation_samples), 2)

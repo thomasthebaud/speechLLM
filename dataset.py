@@ -36,12 +36,13 @@ class MyCollator:
 
 
 class AudioDataset(Dataset):
-    def __init__(self, csv_file, mode='train', random_keys_prob=0.001):
+    def __init__(self, csv_file, mode='train', random_keys_prob=0.001, max_len = 60):
         self.data_frame = pd.read_csv(csv_file)
         self.data_frame = self.data_frame.sample(frac=1, random_state=42).reset_index(drop=True)
         self.mode = mode
         self.random_keys_prob = random_keys_prob
         self.labels = ['isspeech', 'transcript', 'gender', 'emotion', 'age', 'accent']
+        self.max_len = max_len*16_000
         
     def __len__(self):
         return len(self.data_frame)
@@ -55,6 +56,8 @@ class AudioDataset(Dataset):
         else:
             waveform, sample_rate = torchaudio.load(audio_path)
 
+        if waveform.shape[0]==2:waveform=torch.mean(waveform, axis=0).unsqueeze(0)
+        if waveform.shape[1]>self.max_len: waveform=waveform[:, :self.max_len]
         # Prepare labels dictionary based on mode and probability
         labels_str = {}
         if self.mode == 'train' and random.random() < self.random_keys_prob:
