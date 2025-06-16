@@ -1,5 +1,5 @@
 # SpeechLLM
-Repository adapted from ```https://github.com/skit-ai/SpeechLLM/tree/main```
+Repository adapted from [(https://github.com/skit-ai/SpeechLLM/tree/main)]
 
 Currently under work for connectors analysis
 

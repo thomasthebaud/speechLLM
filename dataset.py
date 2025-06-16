@@ -17,10 +17,10 @@ class MyCollator:
     def __call__(self, batch):
         waveform, pre_speech_prompt, post_speech_prompt, output_prompt, complete_prompt = batch[0]
         if waveform is not None:
-            if "openai/whisper" in self.audio_encoder_name:
-                mel = self.wav_2_mel(waveform).unsqueeze(0)
-            else:
-                mel = self.hubert_processor(waveform.squeeze(), return_tensors="pt", sampling_rate=16000).input_values
+            # if "openai/whisper" in self.audio_encoder_name:
+            #     mel = self.wav_2_mel(waveform).unsqueeze(0)
+            # else:
+            mel = self.hubert_processor(waveform.squeeze(), return_tensors="pt", sampling_rate=16000).input_values
         else:
             mel = None
 
@@ -30,9 +30,9 @@ class MyCollator:
         
         return mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids
 
-    def wav_2_mel(self, wav_tensor):
-        mel = whisper.log_mel_spectrogram(wav_tensor[0])
-        return mel
+    # def wav_2_mel(self, wav_tensor):
+    #     mel = whisper.log_mel_spectrogram(wav_tensor[0])
+    #     return mel
 
 
 class AudioDataset(Dataset):
