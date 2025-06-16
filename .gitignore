@@ -1,3 +1,6 @@
 __pycache__/*
 checkpoints/*
-
+logs/*
+data/*
+hf_cache
+wandb/*
