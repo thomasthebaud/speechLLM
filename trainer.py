@@ -55,9 +55,9 @@ class SpeechLLMLightning(pl.LightningModule):
 
     def configure_optimizers(self):
         opt = [
-            {"params": self.audio_encoder.parameters(), "lr": 1e-5},
+            {"params": self.audio_encoder.parameters(), "lr": self.max_lr/10 if self.finetune_encoder else 0},
             {"params": self.connector.parameters(), "lr": self.max_lr},
-            {"params": self.llm_model.parameters(), "lr": self.max_lr},
+            {"params": self.llm_model.parameters(), "lr": self.max_lr if self.use_lora else 0},
         ]
         optimizer = Adam(opt, lr=self.max_lr)
         return optimizer

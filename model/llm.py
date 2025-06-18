@@ -19,5 +19,8 @@ def get_llm(name, use_lora, lora_r, lora_alpha):
 
         llm_model = get_peft_model(llm_model, peft_config)
         llm_model.print_trainable_parameters()
+    else:
+        for param in llm_model.parameters():
+            param.requires_grad = False
 
     return llm_tokenizer, llm_model
