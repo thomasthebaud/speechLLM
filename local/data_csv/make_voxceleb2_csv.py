@@ -13,10 +13,10 @@ metadata = metadata[metadata['speaker_age_title_only'].notna()]
 print(f"{len(metadata)} had age label")
 n = 0
 
-for set in ['dev', 'test']:
+for set in ['test', 'dev']:
     print(set)
     source = f'/export/corpora5/VoxCeleb2/{set}/aac'
-    labels = {'audio_path':[], 'audio_len':[], 'transcript':[], 'gender':[], 'age':[]}
+    labels = {'audio_path':[], 'audio_len':[], 'gender':[], 'age':[]}
     for root, dirs, files in os.walk(source):
         for file in files:
             video_id = root.split('/')[-1]
