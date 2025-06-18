@@ -68,11 +68,11 @@ if __name__ == "__main__":
         mode='test'
         )
 
-    batch_size = 4
+    batch_size = 16
     print(f"Train set:{len(train_dataset)}, val set:{len(val_dataset)}, batch size:{batch_size}")
 
     my_collator = MyCollator(model_config['audio_encoder_name'], tokenizer)
-    sampler = data_utils.WeightedRandomSampler(train_dataset.datasets_weights, batch_size)
+    sampler = data_utils.WeightedRandomSampler(train_dataset.datasets_weights, num_samples=len(train_dataset.datasets_weights), replacement=True)
     train_loader = data_utils.DataLoader(train_dataset, batch_size=batch_size, shuffle=False, sampler=sampler, collate_fn=my_collator, num_workers=3)
     val_loader = data_utils.DataLoader(val_dataset, batch_size=batch_size, shuffle=False, collate_fn=my_collator, num_workers=3)
 

@@ -22,5 +22,6 @@ def get_llm(name, use_lora, lora_r, lora_alpha):
     else:
         for param in llm_model.parameters():
             param.requires_grad = False
+        llm_model.train()
 
     return llm_tokenizer, llm_model
