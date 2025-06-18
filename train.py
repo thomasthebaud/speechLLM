@@ -46,7 +46,7 @@ if __name__ == "__main__":
                 'use_lora': use_lora,
                 'lora_r': 8,
                 'lora_alpha': 16,
-                'max_lr': 1e-4,
+                'max_lr': 1e-4 if 'linear' not in connector_name else 1e-5,
                 'total_training_step': 10000000,
                 'warmup_steps': 100,
                 'train_batch_per_epoch': 10000,
@@ -68,9 +68,9 @@ if __name__ == "__main__":
         mode='test'
         )
 
-    print(len(train_dataset), len(val_dataset))
+    batch_size = 4
+    print(f"Train set:{len(train_dataset)}, val set:{len(val_dataset)}, batch size:{batch_size}")
 
-    batch_size = 2
     my_collator = MyCollator(model_config['audio_encoder_name'], tokenizer)
     sampler = data_utils.WeightedRandomSampler(train_dataset.datasets_weights, batch_size)
     train_loader = data_utils.DataLoader(train_dataset, batch_size=batch_size, shuffle=False, sampler=sampler, collate_fn=my_collator, num_workers=3)

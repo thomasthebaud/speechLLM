@@ -28,11 +28,11 @@ code_to_emo = {'A': 'Angry',
                 'X':'X'
                 }
 
-metadata = {'audio_path':[i[0] for i in labels], 
+metadata = {'audio':[i[0] for i in labels], 
         'emotion':[code_to_emo[i[1].strip(' ')] for i in labels],
         }
 
-assert metadata['audio_path']==list(partitions['audio'])
+assert metadata['audio']==list(partitions['audio'])
 metadata['set'] = list(partitions['set'])
 
 metadata = pd.DataFrame(metadata)
@@ -50,14 +50,17 @@ audio_to_spk = {line[0]:line[1].strip('\n') for line in audio_to_spk}
 # print(spk_idx_to_gender)
 # print(audio_to_spk)
 
-metadata['gender'] = [spk_idx_to_gender[audio_to_spk[i]] if i in audio_to_spk.keys() else 'None' for i in metadata['audio_path']]
+metadata['gender'] = [spk_idx_to_gender[audio_to_spk[i]] if i in audio_to_spk.keys() else 'None' for i in metadata['audio']]
 metadata = metadata[metadata['gender']!='J']
 metadata = metadata[metadata['gender']!='None']
+metadata = metadata[metadata['emotion']!='X']
 print(set(metadata['gender']))
 
+metadata['audio_path'] = [root+'Audio/'+audio_path for audio_path in metadata['audio']]
+metadata.pop('audio')
 audio_lens = []
 for audio_path in tqdm(metadata['audio_path']):
-    audio = mutagen.File(root+'Audio/'+audio_path)
+    audio = mutagen.File(audio_path)
     audio_lens.append(audio.info.length)
 
 metadata['audio_len'] = audio_lens

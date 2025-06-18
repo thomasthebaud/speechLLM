@@ -58,6 +58,8 @@ class AudioDataset(Dataset):
         audio_path = audio_row['audio_path']
         if pd.isna(audio_path):
             waveform = None
+        elif '.mp3' in audio_path:
+            waveform, sample_rate = torchaudio.load(audio_path, format='mp3')
         else:
             waveform, sample_rate = torchaudio.load(audio_path)
 

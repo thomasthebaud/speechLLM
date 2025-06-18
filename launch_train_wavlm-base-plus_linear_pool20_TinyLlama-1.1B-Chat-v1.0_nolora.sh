@@ -6,8 +6,8 @@
 #SBATCH --gpus=1  #number of gpus requested
 #SBATCH --partition=gpu-a100   #queue
 #SBATCH --account=a100acct
-#SBATCH --error=logs/train_wavlm-base-plus_mlp1_TinyLlama-1.1B-Chat-v1.0.log
-#SBATCH --output=logs/train_wavlm-base-plus_mlp1_TinyLlama-1.1B-Chat-v1.0.log
+#SBATCH --error=logs/train_wavlm-base-plus_mlp1_TinyLlama-1.1B-Chat-v1.0_nolora.log
+#SBATCH --output=logs/train_wavlm-base-plus_mlp1_TinyLlama-1.1B-Chat-v1.0_nolora.log
 #SBATCH --exclude=e03
 
 export HF_HOME=./hf_cache/
