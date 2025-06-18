@@ -2,7 +2,7 @@ import torch
 from transformers import AutoProcessor, AutoFeatureExtractor
 
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, Sampler
 import torchaudio
 import pandas as pd
 import random
@@ -12,7 +12,7 @@ class MyCollator:
     def __init__(self, audio_encoder_name, tokenizer):
         self.audio_encoder_name = audio_encoder_name
         self.tokenizer = tokenizer
-        self.hubert_processor = AutoFeatureExtractor.from_pretrained("microsoft/wavlm-base") # change according to the encoder
+        self.hubert_processor = AutoFeatureExtractor.from_pretrained(audio_encoder_name) # change according to the encoder
 
     def __call__(self, batch):
         waveform, pre_speech_prompt, post_speech_prompt, output_prompt, complete_prompt = batch[0]
@@ -41,8 +41,13 @@ class AudioDataset(Dataset):
         self.data_frame = self.data_frame.sample(frac=1, random_state=42).reset_index(drop=True)
         self.mode = mode
         self.random_keys_prob = random_keys_prob
-        self.labels = ['isspeech', 'transcript', 'gender', 'emotion', 'age', 'accent']
+        self.labels = ['transcript', 'gender', 'emotion', 'age', 'accent'] #'isspeech', 
         self.max_len = max_len*16_000
+        datasets = list(self.data_frame['dataset'])
+        dataset_to_index = {d:i for i,d in enumerate(set(datasets))}
+        dataset_indices = np.array([dataset_to_index[d] for d in datasets])
+        index_to_weight = [len(dataset_indices[dataset_indices==i]) for i in set(dataset_indices)]
+        self.datasets_weights = np.array([len(self.data_frame)/index_to_weight[i] for i in dataset_indices])
         
     def __len__(self):
         return len(self.data_frame)

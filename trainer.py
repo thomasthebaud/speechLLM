@@ -68,7 +68,8 @@ class SpeechLLMLightning(pl.LightningModule):
         speech_embeds = self.audio_encoder(mel)
         speech_embeds = self.connector(speech_embeds)
         
-        embedder = self.llm_model.model.model.embed_tokens
+        if self.use_lora: embedder = self.llm_model.model.model.embed_tokens
+        else: embedder = self.llm_model.model.embed_tokens
         pre_prompt_embeds = embedder(pre_tokenized_ids)
         post_prompt_embeds = embedder(post_tokenized_ids)
         output_prompt_embeds = embedder(output_tokenized_ids)
