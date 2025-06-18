@@ -20,4 +20,5 @@ export 'PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512'
 python3 train.py \
     --encoder 'microsoft/wavlm-base-plus' \
     --connector 'cnn' \
-    --llm 'TinyLlama-1.1B-Chat-v1.0' 
+    --llm 'TinyLlama-1.1B-Chat-v1.0' \
+    --batch-size 16

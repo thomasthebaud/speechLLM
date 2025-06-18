@@ -20,4 +20,5 @@ python3 train.py \
     --connector 'linear' \
     --llm 'TinyLlama-1.1B-Chat-v1.0' \
     --connector-k '20' \
-    --no-lora
+    --no-lora \
+    --batch-size 32

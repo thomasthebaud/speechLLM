@@ -18,7 +18,9 @@ if __name__ == "__main__":
     parser.add_argument('--llm')  
     parser.add_argument('--connector-k', default=2)
     parser.add_argument('--connector-dim', default=512)
+    parser.add_argument('--batch-size', default=16)
     parser.add_argument("--no-lora", action='store_true')
+
     args = parser.parse_args()
     model_name = f"{args.encoder.split('/')[-1]}-{args.connector}-{args.llm}"
     if args.no_lora: model_name = model_name+'_nolora'
@@ -32,7 +34,7 @@ if __name__ == "__main__":
 
     connector_name=args.connector
     if args.llm=='TinyLlama-1.1B-Chat-v1.0':llm_name="TinyLlama/TinyLlama-1.1B-Chat-v1.0"
-
+    batch_size = int(args.batch_size)
 
     model_config = {
                 'audio_enc_dim': 768, 
@@ -49,8 +51,8 @@ if __name__ == "__main__":
                 'max_lr': 1e-4 if 'linear' not in connector_name else 1e-5,
                 'total_training_step': 10000000,
                 'warmup_steps': 100,
-                'train_batch_per_epoch': 10000,
-                'val_batch_per_epoch': 1000,
+                'train_batch_per_epoch': 80000//batch_size,
+                'val_batch_per_epoch': 1000//batch_size,
                 'grad_accumulate_steps': 8
         }   
     
@@ -68,7 +70,6 @@ if __name__ == "__main__":
         mode='test'
         )
 
-    batch_size = 16
     print(f"Train set:{len(train_dataset)}, val set:{len(val_dataset)}, batch size:{batch_size}")
 
     my_collator = MyCollator(model_config['audio_encoder_name'], tokenizer)

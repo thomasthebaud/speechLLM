@@ -21,4 +21,5 @@ python3 train.py \
     --encoder 'microsoft/wavlm-base-plus' \
     --connector 'cnn' \
     --llm 'TinyLlama-1.1B-Chat-v1.0' \
-    --no-lora
+    --no-lora \
+    --batch-size 32
