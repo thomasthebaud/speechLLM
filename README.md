@@ -9,6 +9,6 @@ The model inputs an speech audio file of **16 KHz** and predicts the following:
 1. **SpeechActivity** : if the audio signal contains speech (True/False)
 2. **Transcript** : ASR transcript of the audio
 3. **Gender** of the speaker (Female/Male)
-4. **Age** of the speaker (Young/Middle-Age/Senior)
+4. **Age** of the speaker (number)
 5. **Accent** of the speaker (Africa/America/Celtic/Europe/Oceania/South-Asia/South-East-Asia)
 6. **Emotion** of the speaker (Happy/Sad/Anger/Neutral/Frustrated)

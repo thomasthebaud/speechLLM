@@ -15,6 +15,7 @@ import json
 from model.encoder import get_audio_encoder, TransformerAudioEncoder
 from model.connector import get_connector, LinearConnector, LinearPoolConnector, CNNConnector
 from model.llm import get_llm
+from metrics import MAE
 
 class SpeechLLMLightning(pl.LightningModule):
     def __init__(self, 
@@ -145,7 +146,7 @@ class SpeechLLMLightning(pl.LightningModule):
     def test_step(self, batch, batch_idx):
             mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids = batch
             embeds, atts, label_ids = self.encode(mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids)
-            predicted_ids = self.generate(inputs_embeds=embeds).cpu()
+            predicted_ids = self.generate(embeds=embeds).cpu()
             # loss = outputs["loss"]
             # self.log("val/loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True)
             
@@ -202,7 +203,7 @@ class SpeechLLMLightning(pl.LightningModule):
         if 'Age' in keys:
             target_age = extracted_target['Age']
             predicted_age = extracted_pred['Age']
-            self.log(f"{v}/age", float(target_age.lower()==predicted_age.lower()), on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+            self.log(f"{v}/age", MAE(target_age,predicted_age), on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
 
         if 'Accent' in keys:
             target_accent = extracted_target['Accent']
