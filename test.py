@@ -5,32 +5,56 @@ from dataset import InstructionalAudioDataset
 
 import torch.utils.data as data_utils
 from dataset import InstructionalAudioDataset, MyCollator
+import argparse
+
 
 if __name__ == "__main__":
-    
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--encoder')  
+    parser.add_argument('--connector')  
+    parser.add_argument('--llm')  
+    parser.add_argument('--connector-k', default=2)
+    parser.add_argument('--connector-dim', default=512)
+    parser.add_argument('--batch-size', default=16)
+    parser.add_argument("--no-lora", action='store_true')
+
+    args = parser.parse_args()
+    model_name = f"{args.encoder.split('/')[-1]}-{args.connector}-{args.llm}"
+    if args.no_lora: model_name = model_name+'_nolora'
+    use_lora = not args.no_lora
+    if "wavlm" in args.encoder: audio_encoder_name=args.encoder
+    else: exit(f"Uknown encoder reference: {args.encoder}")
+
+    connector_name=args.connector
+    if args.llm=='TinyLlama-1.1B-Chat-v1.0':llm_name="TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+    batch_size = int(args.batch_size)
+
     model_config = {
-                'audio_enc_dim': 1024, 
+                'audio_enc_dim': 768, 
                 'llm_dim': 2048, 
-                'audio_encoder_name': "microsoft/wavlm-large", #"facebook/hubert-xlarge-ll60k",
-                'connector_name': 'cnn',
-                'llm_name': "TinyLlama/TinyLlama-1.1B-Chat-v1.0", #"google/gemma-2b-it", #"TinyLlama/TinyLlama-1.1B-Chat-v1.0", #"microsoft/phi-2", 
+                'audio_encoder_name': audio_encoder_name, 
+                'connector_name': connector_name,
+                'llm_name': llm_name,
                 'finetune_encoder': False,
-                'connector_k': 2,
-                'use_lora': True,
+                'connector_k': int(args.connector_k),
+                'connector_dim': int(args.connector_dim),
+                'use_lora': use_lora,
                 'lora_r': 8,
                 'lora_alpha': 16,
-                'max_lr': 3e-4,
-                'total_training_step': 1000000,
+                'max_lr': 1e-4 if 'linear' not in connector_name else 1e-5,
+                'total_training_step': 10000000,
                 'warmup_steps': 100,
-                'train_batch_per_epoch': 10000,
+                'train_batch_per_epoch': 80000//batch_size,
+                'val_batch_per_epoch': 1000//batch_size,
                 'grad_accumulate_steps': 8
-        }  
+        }
 
-    model = SpeechLLMLightning.load_from_checkpoint("./path-to-checkpoint-dir/best_checkpoint.ckpt")
+    # model = SpeechLLMLightning.load_from_checkpoint(f"checkpoints/{model_name}/last.ckpt")
+    model = SpeechLLMLightning.load_from_checkpoint(f"checkpoints/last.ckpt")
     tokenizer = model.llm_tokenizer
 
     test_dataset = InstructionalAudioDataset(
-        csv_file='./path-to-test-dir/librispeech-test-clean.csv', # same train.csv and dev.csv
+        csv_file='data/test.csv', # same train.csv and dev.csv
         mode='test'
         )
     

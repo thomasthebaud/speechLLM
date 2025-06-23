@@ -77,7 +77,7 @@ if __name__ == "__main__":
     train_loader = data_utils.DataLoader(train_dataset, batch_size=batch_size, shuffle=False, sampler=sampler, collate_fn=my_collator, num_workers=3)
     val_loader = data_utils.DataLoader(val_dataset, batch_size=batch_size, shuffle=False, collate_fn=my_collator, num_workers=3)
 
-    checkpoint_callback = ModelCheckpoint(dirpath="checkpoints", filename=log_path+'-{epoch}', save_top_k=1, monitor="val/loss", save_last=True)
+    checkpoint_callback = ModelCheckpoint(dirpath=f"checkpoints/{model_name}", filename=log_path+'-{epoch}', save_top_k=1, monitor="val/loss", save_last=True)
     early_stop_callback = EarlyStopping(monitor="val/loss", min_delta=0.00, patience=10, verbose=False, mode="min")
 
     trainer = Trainer(
