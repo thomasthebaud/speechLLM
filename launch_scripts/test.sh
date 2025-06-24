@@ -21,4 +21,4 @@ python3 test.py \
     --encoder 'microsoft/wavlm-base-plus' \
     --connector 'cnn' \
     --llm 'TinyLlama-1.1B-Chat-v1.0' \
-    --batch-size 16
+    --batch-size 128

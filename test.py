@@ -19,6 +19,7 @@ if __name__ == "__main__":
     parser.add_argument("--no-lora", action='store_true')
 
     args = parser.parse_args()
+    batch_size = int(args.batch_size)
     model_name = f"{args.encoder.split('/')[-1]}-{args.connector}-{args.llm}"
     if args.no_lora: model_name = model_name+'_nolora'
     use_lora = not args.no_lora
@@ -50,7 +51,7 @@ if __name__ == "__main__":
         }
 
     # model = SpeechLLMLightning.load_from_checkpoint(f"checkpoints/{model_name}/last.ckpt")
-    model = SpeechLLMLightning.load_from_checkpoint(f"checkpoints/last.ckpt")
+    model = SpeechLLMLightning.load_from_checkpoint("checkpoints/logs/wavlm-base-plus-cnn-TinyLlama-1.1B-Chat-v1.0-epoch=56.ckpt")
     tokenizer = model.llm_tokenizer
 
     test_dataset = InstructionalAudioDataset(
@@ -59,7 +60,7 @@ if __name__ == "__main__":
         )
     
     my_collator = MyCollator(model_config['audio_encoder_name'], tokenizer)
-    test_loader = data_utils.DataLoader(test_dataset, batch_size=1, shuffle=False, collate_fn=my_collator, num_workers=3)
+    test_loader = data_utils.DataLoader(test_dataset, batch_size=batch_size, shuffle=False, collate_fn=my_collator, num_workers=3)
     
     trainer = Trainer(
         accelerator='gpu', devices=1

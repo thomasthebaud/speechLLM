@@ -6,8 +6,8 @@
 #SBATCH --gpus=1  #number of gpus requested
 #SBATCH --partition=gpu-a100   #queue
 #SBATCH --account=a100acct
-#SBATCH --error=logs/train_wavlm-base-plus_mlp1_TinyLlama_nolora.log
-#SBATCH --output=logs/train_wavlm-base-plus_mlp1_TinyLlama_nolora.log
+#SBATCH --error=logs/train_wavlm-base-plus_cnn_TinyLlama_lr1e-5.log
+#SBATCH --output=logs/train_wavlm-base-plus_cnn_TinyLlama_lr1e-5.log
 #SBATCH --exclude=e03
 
 export HF_HOME=./hf_cache/
@@ -15,10 +15,11 @@ export HF_DATASETS_CACHE=./hf_cache/
 
 echo `date`
 
+export 'PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512'
+
 python3 train.py \
     --encoder 'microsoft/wavlm-base-plus' \
-    --connector 'linear' \
+    --connector 'cnn' \
     --llm 'TinyLlama-1.1B-Chat-v1.0' \
-    --connector-k '20' \
-    --no-lora \
-    --batch-size 128
+    --batch-size 128 \
+    --lr 0.00001

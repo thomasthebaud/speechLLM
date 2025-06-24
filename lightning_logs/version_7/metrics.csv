@@ -1,0 +1,2 @@
+epoch,step,test/accent,test/age,test/emotion,test/gender,test/wer
+0,0,0.0,-1.0,0.0,0.004769475199282169,0.9816513657569885
