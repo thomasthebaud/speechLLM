@@ -56,7 +56,6 @@ if __name__ == "__main__":
                 'total_training_step': 10000000,
                 'warmup_steps': 100,
                 'train_batch_per_epoch': 160000//batch_size,
-                'val_batch_per_epoch': 10000//batch_size,
                 'grad_accumulate_steps': 8
         }   
     
@@ -95,7 +94,6 @@ if __name__ == "__main__":
             devices=1, accelerator="gpu", 
             strategy=DDPStrategy(find_unused_parameters=False),
             limit_train_batches=model_config['train_batch_per_epoch'], 
-            limit_val_batches=model_config['val_batch_per_epoch'], 
             log_every_n_steps=100, 
             enable_checkpointing=True, 
             callbacks=[checkpoint_callback],
