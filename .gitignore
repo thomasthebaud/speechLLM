@@ -4,3 +4,5 @@ logs/*
 data/*
 hf_cache
 wandb/*
+model/__pycache__
+lightning_logs
