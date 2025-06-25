@@ -27,7 +27,7 @@ if __name__ == "__main__":
     if args.no_lora: model_name = model_name+'_nolora'
     lr = float(args.lr)
     if lr == 1.0: lr = 1e-4 if 'linear' not in args.connector else 1e-5
-    model_name =  f"{model_name}_lr{lr}'
+    model_name =  f"{model_name}_lr{lr}"
     log_path = 'logs/'+model_name
     use_lora = not args.no_lora
     wandb.init(project="speechllm", name=log_path)
