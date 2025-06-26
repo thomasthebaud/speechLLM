@@ -6,14 +6,16 @@
 #SBATCH --gpus=1  #number of gpus requested
 #SBATCH --partition=gpu-a100   #queue
 #SBATCH --account=a100acct
-#SBATCH --error=logs/train_wavlm-base-plus_cnn_TinyLlama_lr1e-5.log
-#SBATCH --output=logs/train_wavlm-base-plus_cnn_TinyLlama_lr1e-5.log
-#SBATCH --exclude=e03
+#SBATCH --error=logs/train_wavlm-base-plus_cnn_TinyLlama_lr1e-5_%j.log
+#SBATCH --output=logs/train_wavlm-base-plus_cnn_TinyLlama_lr1e-5_%j.log
 
 export HF_HOME=./hf_cache/
 export HF_DATASETS_CACHE=./hf_cache/
 
 echo `date`
+ME=`basename "$0"`
+echo "My slurm job id is $ME"
+
 
 export 'PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512'
 

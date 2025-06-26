@@ -41,6 +41,7 @@ if __name__ == "__main__":
                 'connector_dim': int(args.connector_dim),
                 'use_lora': use_lora,
                 'lora_r': 8,
+                'batch_size':batch_size,
                 'lora_alpha': 16,
                 'max_lr': 1e-4 if 'linear' not in connector_name else 1e-5,
                 'total_training_step': 10000000,
@@ -49,7 +50,7 @@ if __name__ == "__main__":
                 'val_batch_per_epoch': 1000//batch_size,
                 'grad_accumulate_steps': 8
         }
-
+    print(model_config)
     # model = SpeechLLMLightning.load_from_checkpoint(f"checkpoints/{model_name}/last.ckpt")
     model = SpeechLLMLightning.load_from_checkpoint("checkpoints/logs/wavlm-base-plus-cnn-TinyLlama-1.1B-Chat-v1.0-epoch=56.ckpt")
     tokenizer = model.llm_tokenizer

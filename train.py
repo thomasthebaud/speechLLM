@@ -10,6 +10,7 @@ import torch.utils.data as data_utils
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 import wandb
 import argparse
+import os
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -18,6 +19,7 @@ if __name__ == "__main__":
     parser.add_argument('--llm')  
     parser.add_argument('--connector-k', default=2)
     parser.add_argument('--connector-dim', default=512)
+    parser.add_argument('--connector-layers', default=1)
     parser.add_argument('--batch-size', default=16)
     parser.add_argument('--lr', default=1.0)
     parser.add_argument("--no-lora", action='store_true')
@@ -49,13 +51,14 @@ if __name__ == "__main__":
                 'finetune_encoder': False,
                 'connector_k': int(args.connector_k),
                 'connector_dim': int(args.connector_dim),
+                'connector_layers': int(args.connector_layers),
                 'use_lora': use_lora,
                 'lora_r': 8,
                 'lora_alpha': 16,
                 'max_lr': lr,
-                'total_training_step': 10000000,
+                'batch_size':batch_size,
+                'total_training_epoch': 1000,
                 'warmup_steps': 100,
-                'train_batch_per_epoch': 160000//batch_size,
                 'grad_accumulate_steps': 8
         }   
     
@@ -90,10 +93,10 @@ if __name__ == "__main__":
     early_stop_callback = EarlyStopping(monitor="val/loss", min_delta=0.00, patience=10, verbose=False, mode="min")
 
     trainer = Trainer(
-            max_epochs=model_config['total_training_step']//model_config['train_batch_per_epoch'], 
+            max_epochs=model_config['total_training_epoch'], 
             devices=1, accelerator="gpu", 
             strategy=DDPStrategy(find_unused_parameters=False),
-            limit_train_batches=model_config['train_batch_per_epoch'], 
+            # limit_train_batches=model_config['train_batch_per_epoch'], 
             log_every_n_steps=100, 
             enable_checkpointing=True, 
             callbacks=[checkpoint_callback],

@@ -8,12 +8,14 @@
 #SBATCH --account=a100acct
 #SBATCH --error=logs/train_wavlm-base-plus_cnn_TinyLlama.log
 #SBATCH --output=logs/train_wavlm-base-plus_cnn_TinyLlama.log
-#SBATCH --exclude=e03
 
 export HF_HOME=./hf_cache/
 export HF_DATASETS_CACHE=./hf_cache/
 
 echo `date`
+ME=`basename "$0"`
+echo "My slurm job id is $ME"
+
 
 export 'PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512'
 

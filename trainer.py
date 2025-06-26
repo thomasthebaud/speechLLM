@@ -27,6 +27,7 @@ class SpeechLLMLightning(pl.LightningModule):
                  finetune_encoder=False,
                  connector_k=5,
                  connector_dim=512,
+                 connector_layers=1,
                  use_lora=True,
                  lora_r=32,
                  lora_alpha=2,
@@ -45,7 +46,7 @@ class SpeechLLMLightning(pl.LightningModule):
         self.use_lora = use_lora
 
         self.audio_encoder = get_audio_encoder(audio_encoder_name, finetune_encoder)
-        self.connector = get_connector(connector_name, audio_enc_dim, llm_dim, connector_k, connector_dim)
+        self.connector = get_connector(connector_name, audio_enc_dim, llm_dim, connector_k, connector_dim, connector_layers)
         self.llm_tokenizer, self.llm_model = get_llm(llm_name, use_lora, lora_r, lora_alpha)
         
         self.max_lr = max_lr
