@@ -21,8 +21,10 @@ if __name__ == "__main__":
     parser.add_argument('--connector-dim', default=512)
     parser.add_argument('--connector-layers', default=1)
     parser.add_argument('--batch-size', default=16)
+    parser.add_argument('--truncate-sec', default=60)
     parser.add_argument('--lr', default=1.0)
     parser.add_argument("--no-lora", action='store_true')
+
 
     args = parser.parse_args()
     model_name = f"{args.encoder.split('/')[-1]}-{args.connector}-{args.llm.split('-')[0]}"
@@ -59,7 +61,8 @@ if __name__ == "__main__":
                 'batch_size':batch_size,
                 'total_training_epoch': 1000,
                 'warmup_steps': 100,
-                'grad_accumulate_steps': 8
+                'grad_accumulate_steps': 8,
+                'max_number_seconds':int(args.truncate_sec)
         }   
     
     model = SpeechLLMLightning(**model_config)
@@ -69,11 +72,13 @@ if __name__ == "__main__":
         csv_file = './data/train.csv',
         mode='train', 
         random_keys_prob=0.2,
+        max_len=model_config['max_number_seconds']
         )
 
     val_dataset = InstructionalAudioDataset(
         csv_file='./data/dev.csv', 
-        mode='test'
+        mode='test',
+        max_len=model_config['max_number_seconds']
         )
 
     print(f"Train set:{len(train_dataset)}, val set:{len(val_dataset)}, batch size:{batch_size}")

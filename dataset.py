@@ -41,7 +41,7 @@ class AudioDataset(Dataset):
         self.data_frame = self.data_frame.sample(frac=1, random_state=42).reset_index(drop=True)
         self.mode = mode
         self.random_keys_prob = random_keys_prob
-        self.labels = ['transcript', 'gender', 'emotion', 'age', 'accent'] #'isspeech', 
+        self.labels = ['transcript', 'gender', 'emotion', 'age', 'accent', 'noises', 'summary'] #'isspeech', 
         self.max_len = max_len*16_000
         datasets = list(self.data_frame['dataset'])
         dataset_to_index = {d:i for i,d in enumerate(set(datasets))}
@@ -95,7 +95,7 @@ class AudioDataset(Dataset):
         return waveform, labels_str, conv_history
     
 class InstructionalAudioDataset(AudioDataset):
-    def __init__(self, csv_file, mode='train', random_keys_prob=0.1):
+    def __init__(self, csv_file, mode='train', random_keys_prob=0.1, max_len = 60):
         """
         Initialize the class with the specified CSV file, mode, and random keys probability.
 
@@ -107,7 +107,7 @@ class InstructionalAudioDataset(AudioDataset):
         Returns:
             None
         """
-        super().__init__(csv_file, mode, random_keys_prob)
+        super().__init__(csv_file, mode, random_keys_prob, max_len = max_len)
         self.instruction_phrases = [
             "Provide the details about the audio",
             "I need the following information from the audio",

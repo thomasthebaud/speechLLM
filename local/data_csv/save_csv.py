@@ -1,7 +1,7 @@
 import pandas as pd
 
 def save_csv(df, dataset, set, target="/home/tthebau1/EDART/SpeechLLM/data/"):
-    columns = ['transcript','gender','emotion','age','accent']
+    columns = ['transcript','gender','emotion','age','accent', 'noises', 'summary']
     df['dataset'] = dataset
     df['set'] = set
     df['isspeech'] = True
