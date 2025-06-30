@@ -17,19 +17,23 @@ if __name__ == "__main__":
     parser.add_argument('--encoder')  
     parser.add_argument('--connector')  
     parser.add_argument('--llm')  
-    parser.add_argument('--connector-k', default=2)
-    parser.add_argument('--connector-dim', default=512)
-    parser.add_argument('--connector-layers', default=1)
-    parser.add_argument('--batch-size', default=16)
-    parser.add_argument('--truncate-sec', default=60)
+    parser.add_argument('--connector-k', default=2, type=int)
+    parser.add_argument('--connector-dim', default=512, type=int)
+    parser.add_argument('--connector-layers', default=1, type=int)
+    parser.add_argument('--batch-size', default=16, type=int)
+    parser.add_argument('--truncate-sec', default=60, type=int)
     parser.add_argument('--lr', default=1.0)
     parser.add_argument("--no-lora", action='store_true')
+    parser.add_argument("--use-summaries", action='store_true')
 
 
     args = parser.parse_args()
-    model_name = f"{args.encoder.split('/')[-1]}-{args.connector}-{args.llm.split('-')[0]}"
-    if args.no_lora: model_name = model_name+'_nolora'
     lr = float(args.lr)
+    batch_size = int(args.batch_size)
+
+    model_name = f"{args.encoder.split('/')[-1]}-{args.connector}-{args.llm.split('-')[0]}-bs{batch_size}"
+    if args.use_summaries: model_name = model_name+'_sum'
+    if args.no_lora: model_name = model_name+'_nolora'
     if lr == 1.0: lr = 1e-4 if 'linear' not in args.connector else 1e-5
     model_name =  f"{model_name}_lr{lr}"
     log_path = 'logs/'+model_name
@@ -42,7 +46,7 @@ if __name__ == "__main__":
 
     
     if args.llm=='TinyLlama-1.1B-Chat-v1.0':llm_name="TinyLlama/TinyLlama-1.1B-Chat-v1.0"
-    batch_size = int(args.batch_size)
+    
     
     model_config = {
                 'audio_enc_dim': 768, 
@@ -61,22 +65,24 @@ if __name__ == "__main__":
                 'batch_size':batch_size,
                 'total_training_epoch': 1000,
                 'warmup_steps': 100,
-                'grad_accumulate_steps': 8,
-                'max_number_seconds':int(args.truncate_sec)
+                'grad_accumulate_steps': 128//batch_size,
+                'max_number_seconds': args.truncate_sec
         }   
     
     model = SpeechLLMLightning(**model_config)
     tokenizer = model.llm_tokenizer
 
+    if args.use_summaries: train_file, dev_file = 'switchboard_train.csv', 'switchboard_val.csv'
+    else: train_file, dev_file = 'train.csv', 'dev.csv'
     train_dataset = InstructionalAudioDataset(
-        csv_file = './data/train.csv',
+        csv_file = f'./data/{train_file}',
         mode='train', 
         random_keys_prob=0.2,
         max_len=model_config['max_number_seconds']
         )
 
     val_dataset = InstructionalAudioDataset(
-        csv_file='./data/dev.csv', 
+        csv_file=f'./data/{dev_file}', 
         mode='test',
         max_len=model_config['max_number_seconds']
         )

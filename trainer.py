@@ -16,6 +16,8 @@ from model.encoder import get_audio_encoder, TransformerAudioEncoder
 from model.connector import get_connector, LinearConnector, LinearPoolConnector, CNNConnector
 from model.llm import get_llm
 from metrics import MAE
+from rouge_score import rouge_scorer
+# from evaluate import load
 
 class SpeechLLMLightning(pl.LightningModule):
     def __init__(self, 
@@ -55,6 +57,9 @@ class SpeechLLMLightning(pl.LightningModule):
         self.use_embedding_loss = False
         self.num_validation_samples = 5000
 
+        self.rouge_scorer = rouge_scorer.RougeScorer(['rouge1', 'rougeL'], use_stemmer=True)
+        # self.bert_scorer = load("bertscore")
+
     def configure_optimizers(self):
         opt = [
             {"params": self.audio_encoder.parameters(), "lr": self.max_lr/10 if self.finetune_encoder else 0},
@@ -67,7 +72,8 @@ class SpeechLLMLightning(pl.LightningModule):
     def encode(self, mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids, return_embedding_loss=False):
         batch_size = mel.shape[0]
 
-        speech_embeds = self.audio_encoder(mel)
+        with torch.no_grad():
+            speech_embeds = self.audio_encoder(mel)
         speech_embeds = self.connector(speech_embeds)
         
         if self.use_lora: embedder = self.llm_model.model.model.embed_tokens
@@ -94,7 +100,7 @@ class SpeechLLMLightning(pl.LightningModule):
         )
         return out
 
-    def generate(self, embeds, max_new_tokens=1024):
+    def generate(self, embeds, max_new_tokens=2048):
         out = self.llm_model.generate(
             inputs_embeds=embeds,
             max_new_tokens=max_new_tokens,
@@ -211,9 +217,23 @@ class SpeechLLMLightning(pl.LightningModule):
             predicted_accent = extracted_pred['Accent']
             self.log(f"{v}/accent", float(target_accent.lower()==predicted_accent.lower()), on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
 
-    def on_validation_epoch_start(self):
-        """Select two random validation samples to log for each epoch."""
-        self.selected_samples_for_logging = random.sample(range(self.num_validation_samples), 2)
+        if 'Noises' in keys:
+            target_noises = extracted_target['Noises']
+            predicted_noises = extracted_pred['Noises']
+            self.log(f"{v}/noises", float(target_noises.lower()==predicted_noises.lower()), on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+
+        if 'Summary' in keys:
+            target_sum = extracted_target['Summary']
+            predicted_sum = extracted_pred['Summary']
+            r_scores = self.rouge_scorer.score(target_sum,predicted_sum)
+            # b_scores = self.bert_scorer.compute(predictions=predicted_sum, references=target_sum, lang="en")
+            self.log(f"{v}/summary/rouge_1", r_scores['rouge1'].precision, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+            self.log(f"{v}/summary/rouge_L", r_scores['rougeL'].precision, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+            # self.log(f"{v}/summary/BertScore", b_scores.precision, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+
+    def on_validation_epoch_start(self, n=16):
+        """Select n=16 random validation samples to log for each epoch."""
+        self.selected_samples_for_logging = random.sample(range(self.num_validation_samples), 16)
 
     
     def extract_dictionary(self, input_string):
