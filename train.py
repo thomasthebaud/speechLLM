@@ -41,7 +41,12 @@ if __name__ == "__main__":
     wandb.init(project="speechllm", name=log_path)
     logger = WandbLogger(project="speechllm", name=log_path)
 
-    if "wavlm" in args.encoder: audio_encoder_name=args.encoder
+    if "wavlm" in args.encoder: 
+        audio_encoder_name=args.encoder
+        audio_enc_dim = 768
+    elif 'MFCC' in args.encoder:
+        audio_encoder_name=args.encoder
+        audio_enc_dim = 80
     else: exit(f"Uknown encoder reference: {args.encoder}")
 
     
@@ -49,7 +54,7 @@ if __name__ == "__main__":
     
     
     model_config = {
-                'audio_enc_dim': 768, 
+                'audio_enc_dim':audio_enc_dim, 
                 'llm_dim': 2048, 
                 'audio_encoder_name': audio_encoder_name, 
                 'connector_name': args.connector,
