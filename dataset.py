@@ -10,12 +10,32 @@ import numpy as np
 
 class MyCollator:
     def __init__(self, audio_encoder_name, tokenizer):
+
         self.audio_encoder_name = audio_encoder_name
         self.tokenizer = tokenizer
-        self.hubert_processor = AutoFeatureExtractor.from_pretrained(audio_encoder_name) # change according to the encoder
+        if self.audio_encoder_name in ["facebook/hubert-xlarge-ll60k", "microsoft/wavlm-large", 'microsoft/wavlm-base-plus']:
+            self.hubert_processor = AutoFeatureExtractor.from_pretrained(audio_encoder_name) # change according to the encoder
+        else:
+            self.hubert_processor = None
+            
 
     def __call__(self, batch):
-        waveform, pre_speech_prompt, post_speech_prompt, output_prompt, complete_prompt = batch[0]
+        mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids = [], [], [], []
+        for el in batch:
+            m,pe,po,o = self.process(el)
+            mel.append(m)
+            pre_tokenized_ids.append(pe)
+            post_tokenized_ids.append(po)
+            output_tokenized_ids.append(o)
+        return (
+            self.pad(mel), 
+            self.pad(pre_tokenized_ids).long(), 
+            self.pad(post_tokenized_ids).long(), 
+            self.pad(output_tokenized_ids).long())
+
+    def process(self, element):
+        waveform, pre_speech_prompt, post_speech_prompt, output_prompt, complete_prompt = element
+
         if waveform is not None:
             # if "openai/whisper" in self.audio_encoder_name:
             #     mel = self.wav_2_mel(waveform).unsqueeze(0)
@@ -30,10 +50,15 @@ class MyCollator:
         
         return mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids
 
-    # def wav_2_mel(self, wav_tensor):
-    #     mel = whisper.log_mel_spectrogram(wav_tensor[0])
-    #     return mel
+    def pad(self, list_tensors):
+        max_len = np.max([i.shape[1] for i in list_tensors])
+        # print(list_tensors[0].shape)
+        output = torch.zeros((len(list_tensors), max_len))
 
+        for i,t in enumerate(list_tensors):
+            # print(t.shape, t.squeeze().shape, len(t.squeeze()), output.shape)
+            output[i, :len(t.squeeze())] = t.squeeze() #mono channel only
+        return output
 
 class AudioDataset(Dataset):
     def __init__(self, csv_file, mode='train', random_keys_prob=0.001, max_len = 60):

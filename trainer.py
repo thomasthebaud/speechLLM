@@ -108,10 +108,6 @@ class SpeechLLMLightning(pl.LightningModule):
         return out
     
     def training_step(self, batch, batch_idx):
-        # self.log({
-        # "cuda_mem_allocated_MB": torch.cuda.memory_allocated() / 1024**2,
-        # "cuda_mem_reserved_MB": torch.cuda.memory_reserved() / 1024**2,
-        # }, step=batch_idx)
         mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids = batch
         embeds, atts, label_ids = self.encode(mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids)
         outputs = self.forward(embeds, atts, label_ids)

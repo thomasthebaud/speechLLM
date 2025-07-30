@@ -38,6 +38,7 @@ if __name__ == "__main__":
     model_name =  f"{model_name}_lr{lr}"
     log_path = 'logs/'+model_name
     use_lora = not args.no_lora
+
     wandb.init(project="speechllm", name=log_path)
     logger = WandbLogger(project="speechllm", name=log_path)
 
@@ -48,7 +49,6 @@ if __name__ == "__main__":
         audio_encoder_name=args.encoder
         audio_enc_dim = 80
     else: exit(f"Uknown encoder reference: {args.encoder}")
-
     
     if args.llm=='TinyLlama-1.1B-Chat-v1.0':llm_name="TinyLlama/TinyLlama-1.1B-Chat-v1.0"
     
@@ -93,11 +93,11 @@ if __name__ == "__main__":
         )
 
     print(f"Train set:{len(train_dataset)}, val set:{len(val_dataset)}, batch size:{batch_size}")
-
+    num_workers=0
     my_collator = MyCollator(model_config['audio_encoder_name'], tokenizer)
     sampler = data_utils.WeightedRandomSampler(train_dataset.datasets_weights, num_samples=len(train_dataset.datasets_weights), replacement=True)
-    train_loader = data_utils.DataLoader(train_dataset, batch_size=batch_size, shuffle=False, sampler=sampler, collate_fn=my_collator, num_workers=3)
-    val_loader = data_utils.DataLoader(val_dataset, batch_size=batch_size, shuffle=False, collate_fn=my_collator, num_workers=3)
+    train_loader = data_utils.DataLoader(train_dataset, batch_size=batch_size, shuffle=False, sampler=sampler, collate_fn=my_collator, num_workers=num_workers)
+    val_loader = data_utils.DataLoader(val_dataset, batch_size=batch_size, shuffle=False, collate_fn=my_collator, num_workers=num_workers)
 
     checkpoint_callback = ModelCheckpoint(
                     dirpath=f"checkpoints/{model_name}", 
@@ -113,7 +113,7 @@ if __name__ == "__main__":
             devices=1, accelerator="gpu", 
             strategy=DDPStrategy(find_unused_parameters=False),
             # limit_train_batches=model_config['train_batch_per_epoch'], 
-            log_every_n_steps=100, 
+            log_every_n_steps=1, 
             enable_checkpointing=True, 
             callbacks=[checkpoint_callback],
             fast_dev_run=False, logger=logger, 

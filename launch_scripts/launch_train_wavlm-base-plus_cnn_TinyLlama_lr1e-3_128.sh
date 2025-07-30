@@ -1,13 +1,13 @@
 #!/bin/bash
 #SBATCH --ntasks-per-node=1
-#SBATCH --mem=24000
+#SBATCH --mem=16000
 #SBATCH --job-name=train_sllm #job name
 #SBATCH --nodes=1  #number of nodes requested
 #SBATCH --gpus=1  #number of gpus requested
 #SBATCH --partition=gpu-a100   #queue
 #SBATCH --account=a100acct
-#SBATCH --error=logs/train_wavlm-base-plus_cnn_TinyLlama_sum_%j.log
-#SBATCH --output=logs/train_wavlm-base-plus_cnn_TinyLlama_sum_%j.log
+#SBATCH --error=logs/train_wavlm-base-plus_cnn_TinyLlama_lr1e-3_%j.log
+#SBATCH --output=logs/train_wavlm-base-plus_cnn_TinyLlama_lr1e-3_%j.log
 
 export HF_HOME=./hf_cache/
 export HF_DATASETS_CACHE=./hf_cache/
@@ -20,8 +20,5 @@ python3 train.py \
     --encoder 'microsoft/wavlm-base-plus' \
     --connector 'cnn' \
     --llm 'TinyLlama-1.1B-Chat-v1.0' \
-    --batch-size 1 \
-    --lr 0.00001 \
-    --truncate-sec 400 \
-    --use-summaries
-
+    --batch-size 128 \
+    --lr 0.001
