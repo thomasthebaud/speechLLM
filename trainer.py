@@ -62,7 +62,7 @@ class SpeechLLMLightning(pl.LightningModule):
 
     def configure_optimizers(self):
         opt = [
-            {"params": self.audio_encoder.parameters(), "lr": self.max_lr/10 if self.finetune_encoder else 0},
+            {"params": self.audio_encoder.parameters(), "lr": self.max_lr/50 if self.finetune_encoder else 0},
             {"params": self.connector.parameters(), "lr": self.max_lr},
             {"params": self.llm_model.parameters(), "lr": self.max_lr if self.use_lora else 0},
         ]
@@ -72,8 +72,12 @@ class SpeechLLMLightning(pl.LightningModule):
     def encode(self, mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids, return_embedding_loss=False):
         batch_size = mel.shape[0]
 
-        with torch.no_grad():
+        if self.finetune_encoder:
             speech_embeds = self.audio_encoder(mel)
+        else:
+            with torch.no_grad():
+                speech_embeds = self.audio_encoder(mel)
+                
         speech_embeds = self.connector(speech_embeds)
         
         if self.use_lora: embedder = self.llm_model.model.model.embed_tokens

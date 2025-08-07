@@ -3,7 +3,7 @@
 from pytorch_lightning import Trainer
 from pytorch_lightning.loggers import WandbLogger
 from trainer import SpeechLLMLightning
-from dataset import InstructionalAudioDataset, MyCollator
+from dataset import InstructionalAudioDataset, MyCollator, CompositeAudioDataset
 from pytorch_lightning.strategies import DDPStrategy
 
 import torch.utils.data as data_utils
@@ -24,6 +24,7 @@ if __name__ == "__main__":
     parser.add_argument('--truncate-sec', default=60, type=int)
     parser.add_argument('--lr', default=1.0)
     parser.add_argument("--no-lora", action='store_true')
+    parser.add_argument("--ft-encoder", action='store_true')
     parser.add_argument("--use-summaries", action='store_true')
 
 
@@ -34,13 +35,14 @@ if __name__ == "__main__":
     model_name = f"{args.encoder.split('/')[-1]}-{args.connector}-{args.llm.split('-')[0]}-bs{batch_size}"
     if args.use_summaries: model_name = model_name+'_sum'
     if args.no_lora: model_name = model_name+'_nolora'
+    if args.ft_encoder: model_name = model_name+'_ft_encoder'
     if lr == 1.0: lr = 1e-4 if 'linear' not in args.connector else 1e-5
     model_name =  f"{model_name}_lr{lr}"
     log_path = 'logs/'+model_name
     use_lora = not args.no_lora
 
-    wandb.init(project="speechllm", name=log_path)
-    logger = WandbLogger(project="speechllm", name=log_path)
+    wandb.init(project="speechllm", name=log_path, group="July experiments")
+    logger = WandbLogger(project="speechllm", name=log_path, group="July experiments")
 
     if "wavlm" in args.encoder: 
         audio_encoder_name=args.encoder
@@ -52,14 +54,27 @@ if __name__ == "__main__":
     
     if args.llm=='TinyLlama-1.1B-Chat-v1.0':llm_name="TinyLlama/TinyLlama-1.1B-Chat-v1.0"
     
-    
+    datasets = {
+    "train":['librispeech_train-clean-100', 'iemocap_ses01-03', 'voxceleb1_dev', 'CV-EN_train', 'MSP_Podcast_Train', 'voxceleb2_enriched_dev'],
+    "dev":['librispeech_dev-clean', 'iemocap_ses04', 'voxceleb1_test', 'CV-EN_dev', 'MSP_Podcast_Validation', 'voxceleb2_enriched_test'],
+    "test":['librispeech_test-clean', 'iemocap_ses05', 'voxceleb1_test', 'CV-EN_test', 'MSP_Podcast_Test', 'voxceleb2_enriched_test'],
+    }
+    datasets = {
+    "train":['librispeech_train-clean-100', 'iemocap_ses01-03', 'voxceleb2_enriched_dev'],
+    "dev":['librispeech_dev-clean', 'iemocap_ses04', 'voxceleb2_enriched_test'],
+    }
+    if args.use_summaries: 
+        datasets['train'].append('switchboard_train')
+        datasets['dev'].append('switchboard_val')
+        datasets['test'].append('switchboard_test')
+
     model_config = {
                 'audio_enc_dim':audio_enc_dim, 
                 'llm_dim': 2048, 
                 'audio_encoder_name': audio_encoder_name, 
                 'connector_name': args.connector,
                 'llm_name': llm_name,
-                'finetune_encoder': False,
+                'finetune_encoder': args.ft_encoder,
                 'connector_k': int(args.connector_k),
                 'connector_dim': int(args.connector_dim),
                 'connector_layers': int(args.connector_layers),
@@ -71,29 +86,32 @@ if __name__ == "__main__":
                 'total_training_epoch': 1000,
                 'warmup_steps': 100,
                 'grad_accumulate_steps': 128//batch_size,
-                'max_number_seconds': args.truncate_sec
+                'max_number_seconds': args.truncate_sec,
+                'train_batch_per_epoch': 2048,
+                'train_sets':datasets['train'],
+                'dev_sets':datasets['dev'],
+                'max_size_per_dev_set':50
         }   
     
     model = SpeechLLMLightning(**model_config)
     tokenizer = model.llm_tokenizer
 
-    if args.use_summaries: train_file, dev_file = 'switchboard_train.csv', 'switchboard_val.csv'
-    else: train_file, dev_file = 'train.csv', 'dev.csv'
-    train_dataset = InstructionalAudioDataset(
-        csv_file = f'./data/{train_file}',
+    train_dataset = CompositeAudioDataset(
+        csv_file = model_config['train_sets'],
         mode='train', 
         random_keys_prob=0.2,
         max_len=model_config['max_number_seconds']
         )
 
-    val_dataset = InstructionalAudioDataset(
-        csv_file=f'./data/{dev_file}', 
+    val_dataset = CompositeAudioDataset(
+        csv_file=model_config['dev_sets'],
         mode='test',
-        max_len=model_config['max_number_seconds']
+        max_len=model_config['max_number_seconds'],
+        max_size=model_config['max_size_per_dev_set']
         )
 
     print(f"Train set:{len(train_dataset)}, val set:{len(val_dataset)}, batch size:{batch_size}")
-    num_workers=0
+    num_workers=3 #put to 0 for debugging
     my_collator = MyCollator(model_config['audio_encoder_name'], tokenizer)
     sampler = data_utils.WeightedRandomSampler(train_dataset.datasets_weights, num_samples=len(train_dataset.datasets_weights), replacement=True)
     train_loader = data_utils.DataLoader(train_dataset, batch_size=batch_size, shuffle=False, sampler=sampler, collate_fn=my_collator, num_workers=num_workers)
@@ -111,8 +129,8 @@ if __name__ == "__main__":
     trainer = Trainer(
             max_epochs=model_config['total_training_epoch'], 
             devices=1, accelerator="gpu", 
-            strategy=DDPStrategy(find_unused_parameters=False),
-            # limit_train_batches=model_config['train_batch_per_epoch'], 
+            strategy=DDPStrategy(find_unused_parameters=args.ft_encoder),
+            limit_train_batches=model_config['train_batch_per_epoch'], 
             log_every_n_steps=1, 
             enable_checkpointing=True, 
             callbacks=[checkpoint_callback],

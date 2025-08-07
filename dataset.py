@@ -4,6 +4,7 @@ from transformers import AutoProcessor, AutoFeatureExtractor
 import torch
 from torch.utils.data import Dataset, Sampler
 import torchaudio
+from torchtune.datasets import ConcatDataset
 import pandas as pd
 import random
 import numpy as np
@@ -61,18 +62,19 @@ class MyCollator:
         return output
 
 class AudioDataset(Dataset):
-    def __init__(self, csv_file, mode='train', random_keys_prob=0.001, max_len = 60):
+    def __init__(self, csv_file, mode='train', random_keys_prob=0.001, max_len = 60, max_size=-1):
         self.data_frame = pd.read_csv(csv_file)
+        if max_size>0 and len(self.data_frame)<max_size : self.data_frame = self.data_frame.sample(n=max_size)
         self.data_frame = self.data_frame.sample(frac=1, random_state=42).reset_index(drop=True)
         self.mode = mode
         self.random_keys_prob = random_keys_prob
         self.labels = ['transcript', 'gender', 'emotion', 'age', 'accent', 'noises', 'summary'] #'isspeech', 
         self.max_len = max_len*16_000
-        datasets = list(self.data_frame['dataset'])
-        dataset_to_index = {d:i for i,d in enumerate(set(datasets))}
-        dataset_indices = np.array([dataset_to_index[d] for d in datasets])
-        index_to_weight = [len(dataset_indices[dataset_indices==i]) for i in set(dataset_indices)]
-        self.datasets_weights = np.array([len(self.data_frame)/index_to_weight[i] for i in dataset_indices])
+        # datasets = list(self.data_frame['dataset'])
+        # dataset_to_index = {d:i for i,d in enumerate(set(datasets))}
+        # dataset_indices = np.array([dataset_to_index[d] for d in datasets])
+        # index_to_weight = [len(dataset_indices[dataset_indices==i]) for i in set(dataset_indices)]
+        # self.datasets_weights = np.array([len(self.data_frame)/index_to_weight[i] for i in dataset_indices])
         
     def __len__(self):
         return len(self.data_frame)
@@ -81,6 +83,7 @@ class AudioDataset(Dataset):
         # Load audio
         audio_row = self.data_frame.iloc[idx]
         audio_path = audio_row['audio_path']
+        # if self.mode=='test':print(idx, audio_row, audio_path, sep='\t')
         if pd.isna(audio_path):
             waveform = None
         elif '.mp3' in audio_path:
@@ -120,7 +123,7 @@ class AudioDataset(Dataset):
         return waveform, labels_str, conv_history
     
 class InstructionalAudioDataset(AudioDataset):
-    def __init__(self, csv_file, mode='train', random_keys_prob=0.1, max_len = 60):
+    def __init__(self, csv_file, mode='train', random_keys_prob=0.1, max_len = 60, max_size=-1):
         """
         Initialize the class with the specified CSV file, mode, and random keys probability.
 
@@ -132,7 +135,7 @@ class InstructionalAudioDataset(AudioDataset):
         Returns:
             None
         """
-        super().__init__(csv_file, mode, random_keys_prob, max_len = max_len)
+        super().__init__(csv_file, mode, random_keys_prob, max_len = max_len, max_size=max_size)
         self.instruction_phrases = [
             "Provide the details about the audio",
             "I need the following information from the audio",
@@ -214,6 +217,29 @@ class InstructionalAudioDataset(AudioDataset):
 
         complete_prompt = pre_speech_prompt + post_speech_prompt + output_prompt
         return waveform, pre_speech_prompt, post_speech_prompt, output_prompt, complete_prompt
+
+class CompositeAudioDataset(Dataset):
+    def __init__(self, list_of_datasets, mode='train', random_keys_prob=0.1, max_len = 60, max_size=-1):
+        datasets = [
+            InstructionalAudioDataset(
+                        csv_file = f'./data/{dataset}.csv',
+                        mode=mode, 
+                        random_keys_prob=random_keys_prob,
+                        max_len=max_len,
+                        max_size=max_size
+                        )
+            for dataset in list_of_datasets
+            ]
+        
+        self.dataset = ConcatDataset(datasets)
+        self.len = np.sum([len(d) for d in self.dataset])
+        self.datasets_weights = np.array([self.len/len(d) for d in self.dataset])
+
+    def __len__(self):
+        return self.len
+
+    def __getitem__(self, idx):
+        return self.dataset[idx]
 
 
 # Example usage
