@@ -120,57 +120,58 @@ class SpeechLLMLightning(pl.LightningModule):
         return loss
     
     def validation_step(self, batch, batch_idx):
-            mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids = batch
-            embeds, atts, label_ids = self.encode(mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids)
-            outputs = self.forward(embeds, atts, label_ids)
-            loss = outputs["loss"]
-            self.log("val/loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
-            
-            # logits = outputs.logits
-            # predicted_ids = torch.argmax(logits, dim=-1).cpu()
+        mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids = batch
+        embeds, atts, label_ids = self.encode(mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids)
+        outputs = self.forward(embeds, atts, label_ids)
+        loss = outputs["loss"]
+        self.log("val/loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+        
+        # logits = outputs.logits
+        # predicted_ids = torch.argmax(logits, dim=-1).cpu()
 
-            predicted_ids = self.generate(embeds=embeds).cpu()
+        predicted_ids = self.generate(embeds=embeds).cpu()
 
-            generated_output_text = self.llm_tokenizer.decode(predicted_ids[0], skip_special_tokens=False)
-            target_text = self.llm_tokenizer.decode(output_tokenized_ids[0], skip_special_tokens=False)
-            
-            extracted_pred = self.extract_prediction_values(generated_output_text)
-            extracted_target = self.extract_prediction_values(target_text)
+        generated_output_text = self.llm_tokenizer.decode(predicted_ids[0], skip_special_tokens=False)
+        target_text = self.llm_tokenizer.decode(output_tokenized_ids[0], skip_special_tokens=False)
+        
+        extracted_pred = self.extract_prediction_values(generated_output_text)
+        extracted_target = self.extract_prediction_values(target_text)
 
-            self.get_keys_and_log(extracted_pred, extracted_target, v='val')
+        self.get_keys_and_log(extracted_pred, extracted_target, v='val')
 
-            if batch_idx in self.selected_samples_for_logging:
-                sample_idx = self.selected_samples_for_logging.index(batch_idx)
-                # Use wandb.log to log prediction and truth texts
-                wandb.log({
-                    f"val_sample_{sample_idx}_pred": wandb.Html(f"<pre>{str(extracted_pred)}</pre>"), 
-                    f"val_sample_{sample_idx}_target": wandb.Html(f"<pre>{str(target_text).replace('<s>', '').replace('</s>', '')}</pre>"),
-                    f"val_sample_{sample_idx}_gen": wandb.Html(f"<pre>{generated_output_text.replace('<s>', '').replace('</s>', '')}</pre>"),
-                }, commit=False)
+        if batch_idx in self.selected_samples_for_logging:
+            sample_idx = self.selected_samples_for_logging.index(batch_idx)
+            # Use wandb.log to log prediction and truth texts
+            wandb.log({
+                f"val_sample_{sample_idx}_pred": wandb.Html(f"<pre>{str(extracted_pred)}</pre>"), 
+                f"val_sample_{sample_idx}_target": wandb.Html(f"<pre>{str(target_text).replace('<s>', '').replace('</s>', '')}</pre>"),
+                f"val_sample_{sample_idx}_gen": wandb.Html(f"<pre>{generated_output_text.replace('<s>', '').replace('</s>', '')}</pre>"),
+            }, commit=False)
 
-            return {"val_loss": loss}
+        return {"val_loss": loss}
     
     def test_step(self, batch, batch_idx):
-            mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids = batch
-            embeds, atts, label_ids = self.encode(mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids)
-            predicted_ids = self.generate(embeds=embeds).cpu()
-            # loss = outputs["loss"]
-            # self.log("val/loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-            
-            # logits = outputs.logits
-            # predicted_ids = torch.argmax(logits, dim=-1)
+        mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids = batch
+        embeds, atts, label_ids = self.encode(mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids)
+        predicted_ids = self.generate(embeds=embeds).cpu()
+        # loss = outputs["loss"]
+        # self.log("val/loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        
+        # logits = outputs.logits
+        # predicted_ids = torch.argmax(logits, dim=-1)
 
-            input_token_length = output_tokenized_ids.shape[1]
-            generated_output_text = self.llm_tokenizer.decode(predicted_ids[0], skip_special_tokens=False)
-            target_text = self.llm_tokenizer.decode(output_tokenized_ids[0], skip_special_tokens=False)
+        input_token_length = output_tokenized_ids.shape[1]
+        generated_output_text = self.llm_tokenizer.decode(predicted_ids[0], skip_special_tokens=False)
+        target_text = self.llm_tokenizer.decode(output_tokenized_ids[0], skip_special_tokens=False)
 
-            extracted_pred = self.extract_prediction_values(generated_output_text)
-            extracted_target = self.extract_prediction_values(target_text)
+        extracted_pred = self.extract_prediction_values(generated_output_text)
+        extracted_target = self.extract_prediction_values(target_text)
 
-            self.get_keys_and_log(extracted_pred, extracted_target, v='test')
+        self.get_keys_and_log(extracted_pred, extracted_target, v='test')
 
-            return {"test_loss": 0}
+        return {"test_loss": 0}
     
+    # TODO
     def get_keys_and_log(self, extracted_pred, extracted_target, v='val'):
 
         keys = extracted_target.keys()
