@@ -171,7 +171,6 @@ class SpeechLLMLightning(pl.LightningModule):
 
         return {"test_loss": 0}
     
-    # TODO
     def get_keys_and_log(self, extracted_pred, extracted_target, v='val'):
 
         keys = extracted_target.keys()
