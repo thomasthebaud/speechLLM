@@ -64,7 +64,7 @@ class MyCollator:
 class AudioDataset(Dataset):
     def __init__(self, csv_file, mode='train', random_keys_prob=0.001, max_len = 60, max_size=-1):
         self.data_frame = pd.read_csv(csv_file)
-        if max_size>0 and len(self.data_frame)<max_size : self.data_frame = self.data_frame.sample(n=max_size)
+        if max_size>0 and len(self.data_frame) > max_size : self.data_frame = self.data_frame.sample(n=max_size)
         self.data_frame = self.data_frame.sample(frac=1, random_state=42).reset_index(drop=True)
         self.mode = mode
         self.random_keys_prob = random_keys_prob
@@ -231,9 +231,17 @@ class CompositeAudioDataset(Dataset):
             for dataset in list_of_datasets
             ]
         
-        self.dataset = ConcatDataset(datasets)
-        self.len = np.sum([len(d) for d in self.dataset])
-        self.datasets_weights = np.array([self.len/len(d) for d in self.dataset])
+        # if only one dataset, use it directly
+        if len(datasets) == 1:
+            self.dataset = datasets[0]
+            self.len = len(self.dataset)
+            self.datasets_weights = np.array([1.0])  # single dataset, weight is 1
+        else:
+            # more than one dataset, use ConcatDataset
+            self.dataset = ConcatDataset(datasets)
+            self.len = len(self.dataset)
+            self.datasets_weights = np.array([self.len/len(d) for d in datasets])
+
 
     def __len__(self):
         return self.len

@@ -97,14 +97,14 @@ if __name__ == "__main__":
     tokenizer = model.llm_tokenizer
 
     train_dataset = CompositeAudioDataset(
-        csv_file = model_config['train_sets'],
+        list_of_datasets = model_config['train_sets'],
         mode='train', 
         random_keys_prob=0.2,
         max_len=model_config['max_number_seconds']
         )
 
     val_dataset = CompositeAudioDataset(
-        csv_file=model_config['dev_sets'],
+        list_of_datasets = model_config['dev_sets'],
         mode='test',
         max_len=model_config['max_number_seconds'],
         max_size=model_config['max_size_per_dev_set']
