@@ -233,17 +233,6 @@ class CompositeAudioDataset(Dataset):
             print(f"Loaded {data_name}, length = {len(data)}")
             
         
-<<<<<<< HEAD
-        self.dataset = ConcatDataset(datasets)
-        print(f"{mode} split loaded, length = {len(self.dataset)}")
-        self.len = len(self.dataset)
-        
-        self.datasets_weights = []
-        for data in datasets:
-            self.datasets_weights = self.datasets_weights + [self.len/len(data)]*len(data)
-        self.datasets_weights = np.array(self.datasets_weights)
-        assert len(self.datasets_weights)==self.len
-=======
         # if only one dataset, use it directly
         if len(datasets) == 1:
             self.dataset = datasets[0]
@@ -255,7 +244,6 @@ class CompositeAudioDataset(Dataset):
             self.len = len(self.dataset)
             self.datasets_weights = np.array([self.len/len(d) for d in datasets])
 
->>>>>>> 3930827b5205c7465ea57d45fc32a8481a41ab1c
 
     def __len__(self):
         return self.len
