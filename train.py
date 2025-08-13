@@ -60,13 +60,16 @@ if __name__ == "__main__":
     "test":['librispeech_test-clean', 'iemocap_ses05', 'voxceleb1_test', 'CV-EN_test', 'MSP_Podcast_Test', 'voxceleb2_enriched_test'],
     }
     datasets = {
-    "train":['librispeech_train-clean-100', 'iemocap_ses01-03', 'voxceleb2_enriched_dev'],
-    "dev":['librispeech_dev-clean', 'iemocap_ses04', 'voxceleb2_enriched_test'],
+    "train":['librispeech_train-clean-100', 'librispeech_train-clean-360', 'iemocap_ses01-03', 'voxceleb2_enriched_dev'],
+    "dev":['librispeech_dev-clean', 'librispeech_dev-other', 'iemocap_ses04', 'voxceleb2_enriched_test'],
     }
     if args.use_summaries: 
-        datasets['train'].append('switchboard_train')
-        datasets['dev'].append('switchboard_val')
-        datasets['test'].append('switchboard_test')
+        datasets['train'] = ['switchboard_train']
+        datasets['dev'] = ['switchboard_train']
+        datasets['test'] = ['switchboard_train']
+        # datasets['train'].append('switchboard_train')
+        # datasets['dev'].append('switchboard_val')
+        # datasets['test'].append('switchboard_test')
 
     model_config = {
                 'audio_enc_dim':audio_enc_dim, 
@@ -87,7 +90,7 @@ if __name__ == "__main__":
                 'warmup_steps': 100,
                 'grad_accumulate_steps': 128//batch_size,
                 'max_number_seconds': args.truncate_sec,
-                'train_batch_per_epoch': 2048,
+                'train_batch_per_epoch': 4096,
                 'train_sets':datasets['train'],
                 'dev_sets':datasets['dev'],
                 'max_size_per_dev_set':50
@@ -97,14 +100,14 @@ if __name__ == "__main__":
     tokenizer = model.llm_tokenizer
 
     train_dataset = CompositeAudioDataset(
-        csv_file = model_config['train_sets'],
+        list_of_datasets=model_config['train_sets'],
         mode='train', 
         random_keys_prob=0.2,
         max_len=model_config['max_number_seconds']
         )
 
     val_dataset = CompositeAudioDataset(
-        csv_file=model_config['dev_sets'],
+        list_of_datasets=model_config['dev_sets'],
         mode='test',
         max_len=model_config['max_number_seconds'],
         max_size=model_config['max_size_per_dev_set']

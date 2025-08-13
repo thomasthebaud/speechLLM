@@ -64,8 +64,8 @@ class MyCollator:
 class AudioDataset(Dataset):
     def __init__(self, csv_file, mode='train', random_keys_prob=0.001, max_len = 60, max_size=-1):
         self.data_frame = pd.read_csv(csv_file)
-        if max_size>0 and len(self.data_frame)<max_size : self.data_frame = self.data_frame.sample(n=max_size)
-        self.data_frame = self.data_frame.sample(frac=1, random_state=42).reset_index(drop=True)
+        if max_size>0 and len(self.data_frame)>max_size : self.data_frame = self.data_frame.sample(n=max_size, random_state=42).reset_index(drop=True)
+        # self.data_frame = self.data_frame.sample(frac=1, random_state=42).reset_index(drop=True)
         self.mode = mode
         self.random_keys_prob = random_keys_prob
         self.labels = ['transcript', 'gender', 'emotion', 'age', 'accent', 'noises', 'summary'] #'isspeech', 
@@ -220,20 +220,28 @@ class InstructionalAudioDataset(AudioDataset):
 
 class CompositeAudioDataset(Dataset):
     def __init__(self, list_of_datasets, mode='train', random_keys_prob=0.1, max_len = 60, max_size=-1):
-        datasets = [
-            InstructionalAudioDataset(
-                        csv_file = f'./data/{dataset}.csv',
+        datasets = []
+        for data_name in list_of_datasets:
+            data = InstructionalAudioDataset(
+                        csv_file = f'./data/{data_name}.csv',
                         mode=mode, 
                         random_keys_prob=random_keys_prob,
                         max_len=max_len,
                         max_size=max_size
                         )
-            for dataset in list_of_datasets
-            ]
+            datasets.append(data)
+            print(f"Loaded {data_name}, length = {len(data)}")
+            
         
         self.dataset = ConcatDataset(datasets)
-        self.len = np.sum([len(d) for d in self.dataset])
-        self.datasets_weights = np.array([self.len/len(d) for d in self.dataset])
+        print(f"{mode} split loaded, length = {len(self.dataset)}")
+        self.len = len(self.dataset)
+        
+        self.datasets_weights = []
+        for data in datasets:
+            self.datasets_weights = self.datasets_weights + [self.len/len(data)]*len(data)
+        self.datasets_weights = np.array(self.datasets_weights)
+        assert len(self.datasets_weights)==self.len
 
     def __len__(self):
         return self.len

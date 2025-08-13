@@ -14,7 +14,7 @@ with open(root+'SPEAKERS.TXT', 'r') as f:
 spks = [line.strip('\n').split('|') for line in spks if line[0]!=';']
 spks = {int(s[0].strip(' ')): [i.strip(' ') for i in s[1:]] for s in spks}
 
-for subset in ['train-clean-100', 'dev-clean', 'test-clean']:
+for subset in ['train-clean-360', 'train-other-500', 'test-other', 'dev-other']:
     source = root+subset
 
     #Get labels
