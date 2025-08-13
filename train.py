@@ -104,9 +104,9 @@ if __name__ == "__main__":
     "dev":['librispeech_dev-clean', 'librispeech_dev-other', 'iemocap_ses04', 'voxceleb2_enriched_test'],
     }
     if args.use_summaries: 
-        datasets['train'] = ['switchboard_train']
-        datasets['dev'] = ['switchboard_train']
-        datasets['test'] = ['switchboard_train']
+        datasets['train'] = ['switchboard_train', 'librispeech_train-clean-360']
+        datasets['dev'] = ['switchboard_val', 'librispeech_dev-clean', 'librispeech_dev-other']
+        datasets['test'] = ['switchboard_test', 'librispeech_test-clean', 'librispeech_test-other']
         # datasets['train'].append('switchboard_train')
         # datasets['dev'].append('switchboard_val')
         # datasets['test'].append('switchboard_test')
