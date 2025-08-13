@@ -64,8 +64,8 @@ class MyCollator:
 class AudioDataset(Dataset):
     def __init__(self, csv_file, mode='train', random_keys_prob=0.001, max_len = 60, max_size=-1):
         self.data_frame = pd.read_csv(csv_file)
-        if max_size>0 and len(self.data_frame)>max_size : self.data_frame = self.data_frame.sample(n=max_size, random_state=42).reset_index(drop=True)
-        # self.data_frame = self.data_frame.sample(frac=1, random_state=42).reset_index(drop=True)
+        if max_size>0 and len(self.data_frame) > max_size : self.data_frame = self.data_frame.sample(n=max_size)
+        self.data_frame = self.data_frame.sample(frac=1, random_state=42).reset_index(drop=True)
         self.mode = mode
         self.random_keys_prob = random_keys_prob
         self.labels = ['transcript', 'gender', 'emotion', 'age', 'accent', 'noises', 'summary'] #'isspeech', 
@@ -233,6 +233,7 @@ class CompositeAudioDataset(Dataset):
             print(f"Loaded {data_name}, length = {len(data)}")
             
         
+<<<<<<< HEAD
         self.dataset = ConcatDataset(datasets)
         print(f"{mode} split loaded, length = {len(self.dataset)}")
         self.len = len(self.dataset)
@@ -242,6 +243,19 @@ class CompositeAudioDataset(Dataset):
             self.datasets_weights = self.datasets_weights + [self.len/len(data)]*len(data)
         self.datasets_weights = np.array(self.datasets_weights)
         assert len(self.datasets_weights)==self.len
+=======
+        # if only one dataset, use it directly
+        if len(datasets) == 1:
+            self.dataset = datasets[0]
+            self.len = len(self.dataset)
+            self.datasets_weights = np.array([1.0])  # single dataset, weight is 1
+        else:
+            # more than one dataset, use ConcatDataset
+            self.dataset = ConcatDataset(datasets)
+            self.len = len(self.dataset)
+            self.datasets_weights = np.array([self.len/len(d) for d in datasets])
+
+>>>>>>> 3930827b5205c7465ea57d45fc32a8481a41ab1c
 
     def __len__(self):
         return self.len
@@ -257,3 +271,4 @@ if __name__ == "__main__":
 
     print(complete_prompt)
     print(waveform)
+
