@@ -1,7 +1,5 @@
-torch==2.0.1
 wandb==0.15.3
 transformers==4.41.2
-torchaudio==2.0.2
 tokenizers==0.19.1
 pytorch-lightning==1.9.4
 peft ==0.9.0
@@ -12,3 +10,9 @@ datasets==2.2.1
 accelerate==0.30.0
 streamlit==1.34.0
 audio_recorder_streamlit==0.0.8
+torch==2.7.1 
+torchvision==0.22.1 
+torchaudio==2.7.1
+torchtune==0.6.1
+torchao==0.12.0
+rouge-score==0.1.2
