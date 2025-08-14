@@ -18,6 +18,7 @@ from model.llm import get_llm
 from metrics import MAE
 from rouge_score import rouge_scorer
 # from evaluate import load
+import logging
 
 class SpeechLLMLightning(pl.LightningModule):
     def __init__(self, 
@@ -104,7 +105,7 @@ class SpeechLLMLightning(pl.LightningModule):
         )
         return out
 
-    def generate(self, embeds, max_new_tokens=2048):
+    def generate(self, embeds, max_new_tokens=4096):
         out = self.llm_model.generate(
             inputs_embeds=embeds,
             max_new_tokens=max_new_tokens,
@@ -168,6 +169,8 @@ class SpeechLLMLightning(pl.LightningModule):
         extracted_target = self.extract_prediction_values(target_text)
 
         self.get_keys_and_log(extracted_pred, extracted_target, v='test')
+        logging.info(f"[PREDICTION]\t{extracted_pred}")
+        logging.info(f"[TARGET]\t{extracted_target}")
 
         return {"test_loss": 0}
     

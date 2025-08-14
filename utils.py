@@ -1,0 +1,102 @@
+import argparse
+
+def get_model_config():
+    # Parse args
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--encoder')  
+    parser.add_argument('--connector')  
+    parser.add_argument('--llm')  
+    parser.add_argument('--connector-k', default=2, type=int)
+    parser.add_argument('--connector-dim', default=512, type=int)
+    parser.add_argument('--connector-layers', default=1, type=int)
+    parser.add_argument('--batch-size', default=16, type=int)
+    parser.add_argument('--truncate-sec', default=60, type=int)
+    parser.add_argument('--lr', default=1.0)
+    parser.add_argument("--no-lora", action='store_true')
+    parser.add_argument("--ft-encoder", action='store_true')
+    parser.add_argument("--use-summaries", action='store_true')
+
+    args = parser.parse_args()
+
+    # Training Parameters
+    lr = float(args.lr)
+    batch_size = int(args.batch_size)
+    use_lora = not args.no_lora
+
+    # Model naming
+    model_name = f"{args.encoder.split('/')[-1]}-{args.connector}-{args.llm.split('-')[0]}-bs{batch_size}"
+    if args.use_summaries: model_name = model_name+'_sum'
+    if args.no_lora: model_name = model_name+'_nolora'
+    if args.ft_encoder: model_name = model_name+'_ft_encoder'
+    if lr == 1.0: lr = 1e-4 if 'linear' not in args.connector else 1e-5
+    model_name =  f"{model_name}_lr{lr}"
+
+    # Wandb params
+    log_path = 'logs/'+model_name
+    
+    # Type of model
+    if args.use_summaries: group='Summarization'
+    else: group='July experiments'
+
+    # Encoder
+    if "wavlm" in args.encoder: 
+        audio_encoder_name=args.encoder
+        audio_enc_dim = 768
+    elif 'MFCC' in args.encoder:
+        audio_encoder_name=args.encoder
+        audio_enc_dim = 80
+    else: exit(f"Uknown encoder reference: {args.encoder}")
+    
+    # LLM
+    if args.llm=='TinyLlama-1.1B-Chat-v1.0':llm_name="TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+
+    # Datasets
+    datasets = {
+    "train":['librispeech_train-clean-100', 'iemocap_ses01-03', 'voxceleb1_dev', 'CV-EN_train', 'MSP_Podcast_Train', 'voxceleb2_enriched_dev'],
+    "dev":['librispeech_dev-clean', 'iemocap_ses04', 'voxceleb1_test', 'CV-EN_dev', 'MSP_Podcast_Validation', 'voxceleb2_enriched_test'],
+    "test":['librispeech_test-clean', 'iemocap_ses05', 'voxceleb1_test', 'CV-EN_test', 'MSP_Podcast_Test', 'voxceleb2_enriched_test'],
+    }
+    datasets = {
+    "train":['librispeech_train-clean-100', 'librispeech_train-clean-360', 'iemocap_ses01-03', 'voxceleb2_enriched_dev'],
+    "dev":['librispeech_dev-clean', 'librispeech_dev-other', 'iemocap_ses04', 'voxceleb2_enriched_test'],
+    "test":['librispeech_test-clean', 'librispeech_test-other', 'iemocap_ses05', 'voxceleb2_enriched_test'],
+    }
+    if args.use_summaries: 
+        datasets['train'] = ['switchboard_train', 'librispeech_train-clean-360']
+        datasets['dev'] = ['switchboard_val', 'librispeech_dev-clean', 'librispeech_dev-other']
+        datasets['test'] = ['switchboard_test', 'librispeech_test-clean', 'librispeech_test-other']
+        # datasets['train'].append('switchboard_train')
+        # datasets['dev'].append('switchboard_val')
+        # datasets['test'].append('switchboard_test')
+
+    # Get all infos
+    model_config = {
+                'audio_enc_dim':audio_enc_dim, 
+                'llm_dim': 2048, 
+                'audio_encoder_name': audio_encoder_name, 
+                'connector_name': args.connector,
+                'llm_name': llm_name,
+                'finetune_encoder': args.ft_encoder,
+                'connector_k': int(args.connector_k),
+                'connector_dim': int(args.connector_dim),
+                'connector_layers': int(args.connector_layers),
+                'use_lora': use_lora,
+                'lora_r': 8,
+                'lora_alpha': 16,
+                'max_lr': lr,
+                'batch_size':batch_size,
+                'total_training_epoch': 1000,
+                'warmup_steps': 100,
+                'grad_accumulate_steps': 64//batch_size,
+                'max_number_seconds': args.truncate_sec,
+                'train_batch_per_epoch': 4096,
+                'train_sets':datasets['train'],
+                'dev_sets':datasets['dev'],
+                'test_sets':datasets['test'],
+                'max_size_per_dev_set':50,
+                'log_path':log_path,
+                'group':group,
+                'model_name':model_name
+
+        }
+    return model_config

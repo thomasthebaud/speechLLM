@@ -21,7 +21,7 @@ python3 train.py \
     --connector 'cnn' \
     --llm 'TinyLlama-1.1B-Chat-v1.0' \
     --batch-size 1 \
-    --lr 0.0001 \
-    --truncate-sec 400 \
+    --lr 0.00001 \
+    --truncate-sec 360 \
     --use-summaries
 

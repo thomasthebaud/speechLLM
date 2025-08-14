@@ -2,8 +2,11 @@ __pycache__/*
 checkpoints/*
 logs/*
 data/*
+!data/test_xs.csv
+!data/dev_xs.csv
 hf_cache
 wandb/*
 model/__pycache__
 lightning_logs
 local/gpt_summaries
+exp/*

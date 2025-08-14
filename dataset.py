@@ -92,7 +92,10 @@ class AudioDataset(Dataset):
             waveform, sample_rate = torchaudio.load(audio_path)
 
         if waveform.shape[0]==2:waveform=torch.mean(waveform, axis=0).unsqueeze(0)
-        if waveform.shape[1]>self.max_len: waveform=waveform[:, :self.max_len]
+        if waveform.shape[1]>self.max_len: 
+            start = int(np.random.rand(1)*(waveform.shape[1]-self.max_len))
+            waveform=waveform[:, start:start+self.max_len]
+            print(f"shape after truncate: {waveform.shape}")
         # Prepare labels dictionary based on mode and probability
         labels_str = {}
         if self.mode == 'train' and random.random() < self.random_keys_prob:
