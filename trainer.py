@@ -105,7 +105,7 @@ class SpeechLLMLightning(pl.LightningModule):
         )
         return out
 
-    def generate(self, embeds, max_new_tokens=4096):
+    def generate(self, embeds, max_new_tokens=2048):
         out = self.llm_model.generate(
             inputs_embeds=embeds,
             max_new_tokens=max_new_tokens,
