@@ -20,7 +20,7 @@ for split in ['train', 'test', 'dev']:
 
     print(split, len(set(metadata['accent'])), set(metadata['accent']), len(metadata), set(metadata['age']))
     age_dic = {'seventies':70, 'fourties':40, 'thirties':30, 'eighties':80, 'teens':10, 'twenties':20, 'sixties':60, 'fifties':50, 'nineties':90}
-    labels = {'audio_path':[], 'audio_len':[], 'gender':[], 'accent':[], 'age':[]}
+    labels = {'audio_path':[], 'audio_len':[], 'gender':[], 'accent':[], 'age':[], 'transcript':[]}
     print(split, len(metadata))
     for idx,row in tqdm(metadata.iterrows(), total=len(metadata)):
         file, age, gender, accent = row['path'], row['age'], row['gender'], row['accent']
@@ -31,6 +31,7 @@ for split in ['train', 'test', 'dev']:
         labels['age'].append(age_dic[age])
         audio = mutagen.File(audio_path)
         labels['audio_len'].append(audio.info.length)
+        labels['transcript'].append(row['sentence'])
 
     
     df = pd.DataFrame(labels)

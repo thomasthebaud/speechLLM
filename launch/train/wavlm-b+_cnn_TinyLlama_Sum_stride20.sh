@@ -6,8 +6,8 @@
 #SBATCH --gpus=1  #number of gpus requested
 #SBATCH --partition=gpu-a100   #queue
 #SBATCH --account=a100acct
-#SBATCH --error=logs/train_wavlm-base-plus_cnn_TinyLlama_sum_str5_%j.log
-#SBATCH --output=logs/train_wavlm-base-plus_cnn_TinyLlama_sum_str5_%j.log
+#SBATCH --error=logs/train/wavlm-base-plus_cnn_TinyLlama_sum_str20_%j.log
+#SBATCH --output=logs/train/wavlm-base-plus_cnn_TinyLlama_sum_str20_%j.log
 
 export HF_HOME=./hf_cache/
 export HF_DATASETS_CACHE=./hf_cache/
@@ -25,7 +25,7 @@ python3 train.py \
     --llm 'TinyLlama-1.1B-Chat-v1.0' \
     --batch-size 1 \
     --lr 0.00001 \
-    --truncate-sec 360 \
+    --truncate-sec 600 \
     --use-summaries \
     --connector-k 5
 

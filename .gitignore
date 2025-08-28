@@ -1,6 +1,7 @@
 __pycache__/*
 checkpoints/*
-logs/*
+logs/*.log
+logs/*/*.log
 data/*
 !data/test_xs.csv
 !data/dev_xs.csv

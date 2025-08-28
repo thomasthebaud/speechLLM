@@ -16,6 +16,7 @@ def get_model_config():
     parser.add_argument("--ft-encoder", action='store_true')
     parser.add_argument("--use-summaries", action='store_true')
     parser.add_argument('--epoch', default=1, type=int)
+    parser.add_argument("--meanpool", default=1, type=int)
 
     args = parser.parse_args()
 
@@ -29,7 +30,11 @@ def get_model_config():
     if args.use_summaries: model_name = model_name+'_sum'
     if args.no_lora: model_name = model_name+'_nolora'
     if args.ft_encoder: model_name = model_name+'_ft_encoder'
+    if args.meanpool!=1: model_name = model_name+f'_mp{args.meanpool}'
     if lr == 1.0: lr = 1e-4 if 'linear' not in args.connector else 1e-5
+    if args.connector=='cnn':
+        stride = int(args.connector_k)*(int(args.connector_k)//2)*(int(args.connector_k)//2)
+        model_name = model_name+f'_str{stride}'
     model_name =  f"{model_name}_lr{lr}"
 
     # Wandb params
@@ -37,7 +42,7 @@ def get_model_config():
     
     # Type of model
     if args.use_summaries: group='Summarization'
-    else: group='July experiments'
+    else: group='August experiments'
 
     # Encoder
     if "wavlm" in args.encoder: 
@@ -53,15 +58,15 @@ def get_model_config():
 
     # Datasets
     datasets = {
-    "train":['librispeech_train-clean-100', 'iemocap_ses01-03', 'voxceleb1_dev', 'CV-EN_train', 'MSP_Podcast_Train', 'voxceleb2_enriched_dev'],
-    "dev":['librispeech_dev-clean', 'iemocap_ses04', 'voxceleb1_test', 'CV-EN_dev', 'MSP_Podcast_Validation', 'voxceleb2_enriched_test'],
-    "test":['librispeech_test-clean', 'iemocap_ses05', 'voxceleb1_test', 'CV-EN_test', 'MSP_Podcast_Test', 'voxceleb2_enriched_test'],
+    "train":['librispeech_train-clean-100', 'iemocap_ses01-03', 'CV-EN_train', 'MSP_Podcast_Train', 'voxceleb2_enriched_dev'],
+    "dev":['librispeech_dev-clean', 'iemocap_ses04', 'CV-EN_dev', 'MSP_Podcast_Validation', 'voxceleb2_enriched_test'],
+    "test":['librispeech_test-clean', 'iemocap_ses05', 'CV-EN_test', 'MSP_Podcast_Test', 'voxceleb2_enriched_test'],
     }
-    datasets = {
-    "train":['librispeech_train-clean-100', 'librispeech_train-clean-360', 'iemocap_ses01-03', 'voxceleb2_enriched_dev'],
-    "dev":['librispeech_dev-clean', 'librispeech_dev-other', 'iemocap_ses04', 'voxceleb2_enriched_test'],
-    "test":['librispeech_test-clean', 'librispeech_test-other', 'iemocap_ses05', 'voxceleb2_enriched_test', 'MSP_Podcast_Test'],
-    }
+    # datasets = {
+    # "train":['librispeech_train-clean-100', 'librispeech_train-clean-360', 'iemocap_ses01-03', 'voxceleb2_enriched_dev', 'MSP_Podcast_Train'],
+    # "dev":['librispeech_dev-clean', 'librispeech_dev-other', 'iemocap_ses04', 'voxceleb2_enriched_test'],
+    # "test":['librispeech_test-clean', 'librispeech_test-other', 'iemocap_ses05', 'voxceleb2_enriched_test', 'MSP_Podcast_Test'],
+    # }
     if args.use_summaries: 
         datasets['train'] = ['switchboard_train', 'librispeech_train-clean-360']
         datasets['dev'] = ['switchboard_val', 'librispeech_dev-clean', 'librispeech_dev-other']
@@ -81,6 +86,7 @@ def get_model_config():
                 'connector_k': int(args.connector_k),
                 'connector_dim': int(args.connector_dim),
                 'connector_layers': int(args.connector_layers),
+                'meanpool':int(args.meanpool),
                 'use_lora': use_lora,
                 'lora_r': 8,
                 'lora_alpha': 16,

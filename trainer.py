@@ -31,6 +31,7 @@ class SpeechLLMLightning(pl.LightningModule):
                  connector_k=5,
                  connector_dim=512,
                  connector_layers=1,
+                 meanpool=1,
                  use_lora=True,
                  lora_r=32,
                  lora_alpha=2,
@@ -49,7 +50,7 @@ class SpeechLLMLightning(pl.LightningModule):
         self.use_lora = use_lora
 
         self.audio_encoder = get_audio_encoder(audio_encoder_name, finetune_encoder)
-        self.connector = get_connector(connector_name, audio_enc_dim, llm_dim, connector_k, connector_dim, connector_layers)
+        self.connector = get_connector(connector_name, audio_enc_dim, llm_dim, connector_k, connector_dim, connector_layers, meanpool=meanpool)
         self.llm_tokenizer, self.llm_model = get_llm(llm_name, use_lora, lora_r, lora_alpha)
         
         self.max_lr = max_lr
@@ -70,16 +71,38 @@ class SpeechLLMLightning(pl.LightningModule):
         optimizer = Adam(opt, lr=self.max_lr)
         return optimizer
 
-    def encode(self, mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids, return_embedding_loss=False):
-        batch_size = mel.shape[0]
-
+    def encode_speech_segment(self, mel):
         if self.finetune_encoder:
             speech_embeds = self.audio_encoder(mel)
         else:
             with torch.no_grad():
                 speech_embeds = self.audio_encoder(mel)
-                
-        speech_embeds = self.connector(speech_embeds)
+        # print(f"encoded size: {speech_embeds.shape}")
+        return self.connector(speech_embeds)
+
+    def encode(self, mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids, return_embedding_loss=False, chunk_size=60*16_000):
+        batch_size = mel.shape[0]
+        
+        #use chunks of size 1min max
+        # print(f"{mel.shape}")
+        if mel.shape[1]<chunk_size:
+            speech_embeds = self.encode_speech_segment(mel)
+        else:
+            chunks = mel.split(chunk_size, dim=1)
+            outs = []
+            for c in chunks:
+                # print(f"{mel.shape}, {c.shape}")
+                # if c.shape[1]>4000: 
+                try:
+                    outs.append(self.encode_speech_segment(c))
+                except:
+                    print(f"Failed: {mel.shape}, {c.shape}")
+            speech_embeds = torch.cat(outs, dim=1)
+            # print(f"{mel.shape}, {speech_embeds.shape}")
+            del mel
+            del chunks
+            del outs
+
         
         if self.use_lora: embedder = self.llm_model.model.model.embed_tokens
         else: embedder = self.llm_model.model.embed_tokens
