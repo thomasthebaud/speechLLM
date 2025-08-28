@@ -15,6 +15,7 @@ def get_model_config():
     parser.add_argument("--no-lora", action='store_true')
     parser.add_argument("--ft-encoder", action='store_true')
     parser.add_argument("--use-summaries", action='store_true')
+    parser.add_argument('--epoch', default=1, type=int)
 
     args = parser.parse_args()
 
@@ -59,7 +60,7 @@ def get_model_config():
     datasets = {
     "train":['librispeech_train-clean-100', 'librispeech_train-clean-360', 'iemocap_ses01-03', 'voxceleb2_enriched_dev'],
     "dev":['librispeech_dev-clean', 'librispeech_dev-other', 'iemocap_ses04', 'voxceleb2_enriched_test'],
-    "test":['librispeech_test-clean', 'librispeech_test-other', 'iemocap_ses05', 'voxceleb2_enriched_test'],
+    "test":['librispeech_test-clean', 'librispeech_test-other', 'iemocap_ses05', 'voxceleb2_enriched_test', 'MSP_Podcast_Test'],
     }
     if args.use_summaries: 
         datasets['train'] = ['switchboard_train', 'librispeech_train-clean-360']
@@ -96,7 +97,8 @@ def get_model_config():
                 'max_size_per_dev_set':50,
                 'log_path':log_path,
                 'group':group,
-                'model_name':model_name
+                'model_name':model_name,
+                'epoch_to_test':int(args.epoch)
 
         }
     return model_config

@@ -9,6 +9,42 @@ import pandas as pd
 import random
 import numpy as np
 
+def make_weighted_sampler_from_dataset(dataset, dtype=torch.double):
+    """
+    Build a WeightedRandomSampler from a CompositeAudioDataset.
+    - If dataset contains only one sub-dataset: return None (use shuffle=True outside).
+    - If multiple sub-datasets: expand dataset.datasets_weights into per-sample weights.
+    
+    Args:
+        dataset: CompositeAudioDataset or similar object containing .dataset.datasets and .datasets_weights
+        dtype: torch dtype for the weights tensor (default: torch.double)
+    
+    Returns:
+        WeightedRandomSampler if multiple sub-datasets, otherwise None.
+    """
+    # Get the list of sub-datasets (in case of ConcatDataset)
+    subs = getattr(getattr(dataset, "dataset", None), "datasets", None)
+
+    # If not multiple sub-datasets, return None (then set shuffle=True)
+    if not (isinstance(subs, (list, tuple)) and len(subs) > 1):
+        return None
+
+    sizes = [len(d) for d in subs]
+    dataset_weights = getattr(dataset, "datasets_weights", None)
+    if dataset_weights is None or len(dataset_weights) != len(sizes):
+        raise ValueError("datasets_weights is missing or does not match the number of sub-datasets.")
+
+    # Expand per-dataset weight to per-sample weight
+    weights_per_sample = torch.cat([
+        torch.full((sz,), float(w) / sz, dtype=dtype)
+        for w, sz in zip(dataset_weights, sizes)
+    ])
+    assert len(weights_per_sample) == len(dataset), "weights length must match the total number of samples."
+
+    return data_utils.WeightedRandomSampler(weights_per_sample,
+                                  num_samples=len(weights_per_sample),
+                                  replacement=True)
+                                  
 class MyCollator:
     def __init__(self, audio_encoder_name, tokenizer):
 
@@ -95,7 +131,7 @@ class AudioDataset(Dataset):
         if waveform.shape[1]>self.max_len: 
             start = int(np.random.rand(1)*(waveform.shape[1]-self.max_len))
             waveform=waveform[:, start:start+self.max_len]
-            print(f"shape after truncate: {waveform.shape}")
+            print(f"DEBUG: shape after truncate: {waveform.shape}")
         # Prepare labels dictionary based on mode and probability
         labels_str = {}
         if self.mode == 'train' and random.random() < self.random_keys_prob:

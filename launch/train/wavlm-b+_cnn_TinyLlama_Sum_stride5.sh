@@ -6,11 +6,14 @@
 #SBATCH --gpus=1  #number of gpus requested
 #SBATCH --partition=gpu-a100   #queue
 #SBATCH --account=a100acct
-#SBATCH --error=logs/train_wavlm-base-plus_cnn_TinyLlama_sum_%j.log
-#SBATCH --output=logs/train_wavlm-base-plus_cnn_TinyLlama_sum_%j.log
+#SBATCH --error=logs/train_wavlm-base-plus_cnn_TinyLlama_sum_str5_%j.log
+#SBATCH --output=logs/train_wavlm-base-plus_cnn_TinyLlama_sum_str5_%j.log
 
 export HF_HOME=./hf_cache/
 export HF_DATASETS_CACHE=./hf_cache/
+
+export CUDA_LAUNCH_BLOCKING=1
+export PYTHONFAULTHANDLER=1
 
 echo `date`
 

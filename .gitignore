@@ -10,3 +10,5 @@ model/__pycache__
 lightning_logs
 local/gpt_summaries
 exp/*
+pymp*
+tmp*

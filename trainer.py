@@ -117,7 +117,7 @@ class SpeechLLMLightning(pl.LightningModule):
         embeds, atts, label_ids = self.encode(mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids)
         outputs = self.forward(embeds, atts, label_ids)
         loss =  outputs["loss"]
-        self.log("train/loss", loss, on_epoch=False, on_step=True, sync_dist=True)
+        self.log("train/loss", loss, on_epoch=True, on_step=False, sync_dist=True)
         return loss
     
     def validation_step(self, batch, batch_idx):

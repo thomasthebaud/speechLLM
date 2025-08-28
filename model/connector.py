@@ -71,13 +71,13 @@ class CNNConnector(nn.Module):
         self.layer = nn.Sequential(
             nn.ReLU(),
             nn.Conv1d(in_channels, out_channels//2, kernel_size=5,
-                      stride=1, padding=0),
+                      stride=k//2, padding=0),
             nn.ReLU(),
             nn.Conv1d(out_channels//2, out_channels, kernel_size=5,
                       stride=k, padding=0),
             nn.ReLU(),
             nn.Conv1d(out_channels, out_channels, kernel_size=5,
-                      stride=1, padding=0),
+                      stride=k//2, padding=0),
         )
 
     def forward(self, x):

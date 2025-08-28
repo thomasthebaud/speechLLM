@@ -8,6 +8,7 @@
 #SBATCH --account=a100acct
 #SBATCH --error=logs/train_wavlm-base-plus_cnn_TinyLlama_lr1e-4_ft_e_%j.log
 #SBATCH --output=logs/train_wavlm-base-plus_cnn_TinyLlama_lr1e-4_ft_e_%j.log
+#SBATCH --exclude=e05
 
 export HF_HOME=./hf_cache/
 export HF_DATASETS_CACHE=./hf_cache/

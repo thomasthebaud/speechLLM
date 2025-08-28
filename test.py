@@ -14,7 +14,7 @@ if __name__ == "__main__":
     model_config = get_model_config()
     print(model_config)
     # model = SpeechLLMLightning.load_from_checkpoint(f"checkpoints/{model_name}/last.ckpt")
-    version = f"{model_config['model_name']}epoch-epoch=311"
+    version = f"{model_config['model_name']}epoch-epoch={model_config['epoch_to_test']}"
     model = SpeechLLMLightning.load_from_checkpoint(f"checkpoints/{model_config['model_name']}/{version}.ckpt")
     tokenizer = model.llm_tokenizer
     trainer = Trainer(
