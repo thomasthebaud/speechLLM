@@ -98,14 +98,15 @@ class MyCollator:
         return output
 
 class AudioDataset(Dataset):
-    def __init__(self, csv_file, mode='train', random_keys_prob=0.001, max_len = -1, max_size=-1):
+    def __init__(self, csv_file, mode='train',random_keys_prob=0.001, max_len = -1, max_size=-1, fields=[]):
         self.data_frame = pd.read_csv(csv_file)
         if max_size>0 and len(self.data_frame) > max_size : self.data_frame = self.data_frame.sample(n=max_size)
         self.data_frame = self.data_frame.sample(frac=1, random_state=42).reset_index(drop=True)
         self.mode = mode
-        self.random_keys_prob = random_keys_prob
-        self.labels = ['transcript', 'gender', 'emotion', 'age', 'accent', 'noises', 'summary'] #'isspeech', 
-        self.max_len = max_len*16_000 if max_len>0 else max_len
+        if len(fields)==0: self.labels = ['transcript', 'gender', 'emotion', 'age', 'accent', 'noises', 'summary'] #'isspeech', 
+        else: self.labels = fields
+        self.max_len = max_len*16_000
+        self.random_keys_prob=random_keys_prob
         # datasets = list(self.data_frame['dataset'])
         # dataset_to_index = {d:i for i,d in enumerate(set(datasets))}
         # dataset_indices = np.array([dataset_to_index[d] for d in datasets])
@@ -132,7 +133,7 @@ class AudioDataset(Dataset):
             start = int(np.random.rand(1)*(waveform.shape[1]-self.max_len))
             waveform=waveform[:, start:start+self.max_len]
             print(f"DEBUG: shape after truncate: {waveform.shape}")
-        # Prepare labels dictionary based on mode and probability
+        # # Prepare labels dictionary based on mode and probability
         labels_str = {}
         if self.mode == 'train' and random.random() < self.random_keys_prob:
             random_labels = random.sample(self.labels, k=random.randint(1, len(self.labels)))
@@ -144,7 +145,7 @@ class AudioDataset(Dataset):
                     else:
                         labels_str[formatted_label] = str(audio_row[label]).lower()
         else:
-            # Most of the time, include all available labels
+            # include all available labels
             for label in self.labels:
                 if label in audio_row and pd.notnull(audio_row[label]):
                     formatted_label = label.capitalize()
@@ -162,19 +163,17 @@ class AudioDataset(Dataset):
         return waveform, labels_str, conv_history
     
 class InstructionalAudioDataset(AudioDataset):
-    def __init__(self, csv_file, mode='train', random_keys_prob=0.1, max_len = -1, max_size=-1):
+    def __init__(self, csv_file, mode='train',random_keys_prob=0.001,  max_len = -1, max_size=-1, fields=[]):
         """
         Initialize the class with the specified CSV file, mode, and random keys probability.
 
         Args:
             csv_file (str): The path to the CSV file.
             mode (str, optional): The mode of the operation, defaults to 'train'.
-            random_keys_prob (float, optional): The probability of using random keys, defaults to 0.1.
-
         Returns:
             None
         """
-        super().__init__(csv_file, mode, random_keys_prob, max_len = max_len, max_size=max_size)
+        super().__init__(csv_file, mode, random_keys_prob=random_keys_prob, max_len = max_len, max_size=max_size, fields=fields)
         self.instruction_phrases = [
             "Provide the details about the audio",
             "I need the following information from the audio",
@@ -258,7 +257,7 @@ class InstructionalAudioDataset(AudioDataset):
         return waveform, pre_speech_prompt, post_speech_prompt, output_prompt, complete_prompt
 
 class CompositeAudioDataset(Dataset):
-    def __init__(self, list_of_datasets, mode='train', random_keys_prob=0.1, max_len = -1, max_size=-1):
+    def __init__(self, list_of_datasets, mode='train', random_keys_prob=0.001, max_len = -1, max_size=-1):
         datasets = []
         for data_name in list_of_datasets:
             data = InstructionalAudioDataset(
@@ -266,7 +265,8 @@ class CompositeAudioDataset(Dataset):
                         mode=mode, 
                         random_keys_prob=random_keys_prob,
                         max_len=max_len,
-                        max_size=max_size
+                        max_size=max_size,
+                        fields=list_of_datasets[data_name]
                         )
             datasets.append(data)
             print(f"Loaded {data_name}, length = {len(data)}")
@@ -293,7 +293,7 @@ class CompositeAudioDataset(Dataset):
 
 # Example usage
 if __name__ == "__main__":
-    dataset = InstructionalAudioDataset(csv_file='dev.csv', mode='test', random_keys_prob=0.0001)
+    dataset = InstructionalAudioDataset(csv_file='dev.csv', mode='test')
     waveform, pre_speech_prompt, post_speech_prompt, output_prompt, complete_prompt = dataset[121]
 
     print(complete_prompt)

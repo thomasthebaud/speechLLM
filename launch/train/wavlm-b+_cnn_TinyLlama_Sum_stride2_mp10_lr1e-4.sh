@@ -24,5 +24,6 @@ python3 train.py \
     --lr 0.0001 \
     --use-summaries \
     --connector-k 2 \
-    --meanpool 10
+    --meanpool 10 \
+    --group 'Summarization'
 

@@ -1,0 +1,14 @@
+{
+    "train":
+    {
+        "voxceleb2_enriched_dev":["gender"]
+    },
+    "dev":
+    {
+        "voxceleb2_enriched_test":["gender"]
+    },
+    "test":
+    {
+        "voxceleb2_enriched_test":["gender"]
+    }        
+}

@@ -41,9 +41,10 @@ if __name__ == "__main__":
         logging.info(f"Testing {test_set}")
 
         test_dataset = InstructionalAudioDataset(
-        csv_file=f'./data/{test_set}.csv',
-        mode='test', 
-        max_len=model_config['max_number_seconds']
+            csv_file=f'./data/{test_set}.csv',
+            mode='test', 
+            max_len=model_config['max_number_seconds'],
+            fields=model_config['test_sets'][test_set]
         )
         my_collator = MyCollator(model_config['audio_encoder_name'], tokenizer)
         test_loader = data_utils.DataLoader(test_dataset, batch_size=model_config['batch_size'], shuffle=False, collate_fn=my_collator, num_workers=3)

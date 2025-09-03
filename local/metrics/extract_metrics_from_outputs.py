@@ -10,7 +10,7 @@ import pandas as pd
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model-name', default='wavlm-base-plus-cnn-TinyLlama-bs1_sum_mp10_str2_lr1e-05')  
+    parser.add_argument('--model-name', default='wavlm-base-plus-cnn-TinyLlama-bs1_sum_mp10_str2_lr1e-04')  
     args = parser.parse_args()
     model_name = args.model_name
     metrics = {}

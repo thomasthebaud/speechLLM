@@ -21,10 +21,10 @@ class LinearConnector(nn.Module):
         self.pool = nn.AvgPool1d(kernel_size=k, stride=k)
 
     def forward(self, x):
-        x = self.layer(x)
         x = x.transpose(1, 2) 
         x = self.pool(x)  
         x = x.transpose(1, 2)
+        x = self.layer(x)
         return x
 
 class MLPConnector(nn.Module):

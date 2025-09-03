@@ -1,4 +1,24 @@
 import argparse
+import json
+
+def get_config(args):
+    if args.use_config is None: #use default config
+        datasets = {
+        "train":['librispeech_train-clean-100', 'iemocap_ses01-03', 'CV-EN_train', 'MSP_Podcast_Train', 'voxceleb2_enriched_dev'],
+        "dev":['librispeech_dev-clean', 'iemocap_ses04', 'CV-EN_dev', 'MSP_Podcast_Validation', 'voxceleb2_enriched_test'],
+        "test":['librispeech_test-clean', 'iemocap_ses05', 'CV-EN_test', 'MSP_Podcast_Test', 'voxceleb2_enriched_test'],
+        }
+        if args.use_summaries: 
+            datasets['train'] = ['switchboard_train', 'librispeech_train-clean-360']
+            datasets['dev'] = ['switchboard_val', 'librispeech_dev-clean', 'librispeech_dev-other']
+            datasets['test'] = ['switchboard_test', 'librispeech_test-clean', 'librispeech_test-other']
+        
+        datasets = {split:{data:[] for data in datasets[split]} for split in datasets} #empty list means use all available fields for that dataset
+    else:
+        with open(f'config/{args.use_config}', 'r') as file:
+            datasets = json.load(file)
+    return datasets
+
 
 def get_model_config():
     # Parse args
@@ -16,8 +36,11 @@ def get_model_config():
     parser.add_argument("--no-lora", action='store_true')
     parser.add_argument("--ft-encoder", action='store_true')
     parser.add_argument("--use-summaries", action='store_true')
-    parser.add_argument('--epoch', default=1, type=int)
+    parser.add_argument('--epoch-to-test', default=1, type=int)
     parser.add_argument("--meanpool", default=1, type=int)
+    parser.add_argument("--total-training-epoch", default=1000, type=int)
+    parser.add_argument("--use-config", default=None, type=str)
+    parser.add_argument("--group", default='August experiments', type=str)
 
     args = parser.parse_args()
 
@@ -31,7 +54,7 @@ def get_model_config():
     if args.use_summaries: model_name = model_name+'_sum'
     if args.no_lora: model_name = model_name+'_nolora'
     if args.ft_encoder: model_name = model_name+'_ft_encoder'
-    if args.encoder_lr==-1: args.encoder_lr = args.lr/50
+    if args.encoder_lr==-1: args.encoder_lr = float(args.lr)/50
     if args.meanpool!=1: model_name = model_name+f'_mp{args.meanpool}'
     if lr == 1.0: lr = 1e-4 if 'linear' not in args.connector else 1e-5
     if args.connector=='cnn':
@@ -41,10 +64,7 @@ def get_model_config():
 
     # Wandb params
     log_path = 'logs/'+model_name
-    
-    # Type of model
-    if args.use_summaries: group='Summarization'
-    else: group='August experiments'
+    group = args.group
 
     # Encoder
     if "wavlm" in args.encoder: 
@@ -59,23 +79,7 @@ def get_model_config():
     if args.llm=='TinyLlama-1.1B-Chat-v1.0':llm_name="TinyLlama/TinyLlama-1.1B-Chat-v1.0"
 
     # Datasets
-    datasets = {
-    "train":['librispeech_train-clean-100', 'iemocap_ses01-03', 'CV-EN_train', 'MSP_Podcast_Train', 'voxceleb2_enriched_dev'],
-    "dev":['librispeech_dev-clean', 'iemocap_ses04', 'CV-EN_dev', 'MSP_Podcast_Validation', 'voxceleb2_enriched_test'],
-    "test":['librispeech_test-clean', 'iemocap_ses05', 'CV-EN_test', 'MSP_Podcast_Test', 'voxceleb2_enriched_test'],
-    }
-    # datasets = {
-    # "train":['librispeech_train-clean-100', 'librispeech_train-clean-360', 'iemocap_ses01-03', 'voxceleb2_enriched_dev', 'MSP_Podcast_Train'],
-    # "dev":['librispeech_dev-clean', 'librispeech_dev-other', 'iemocap_ses04', 'voxceleb2_enriched_test'],
-    # "test":['librispeech_test-clean', 'librispeech_test-other', 'iemocap_ses05', 'voxceleb2_enriched_test', 'MSP_Podcast_Test'],
-    # }
-    if args.use_summaries: 
-        datasets['train'] = ['switchboard_train', 'librispeech_train-clean-360']
-        datasets['dev'] = ['switchboard_val', 'librispeech_dev-clean', 'librispeech_dev-other']
-        datasets['test'] = ['switchboard_test', 'librispeech_test-clean', 'librispeech_test-other']
-        # datasets['train'].append('switchboard_train')
-        # datasets['dev'].append('switchboard_val')
-        # datasets['test'].append('switchboard_test')
+    datasets = get_config(args)
 
     # Get all infos
     model_config = {
@@ -95,7 +99,7 @@ def get_model_config():
                 'max_lr': lr,
                 'enc_lr': args.encoder_lr,
                 'batch_size':batch_size,
-                'total_training_epoch': 1000,
+                'total_training_epoch': int(args.total_training_epoch),
                 'warmup_steps': 100,
                 'grad_accumulate_steps': 64//batch_size,
                 'max_number_seconds': args.truncate_sec,
@@ -107,7 +111,7 @@ def get_model_config():
                 'log_path':log_path,
                 'group':group,
                 'model_name':model_name,
-                'epoch_to_test':int(args.epoch)
+                'epoch_to_test':int(args.epoch_to_test)
 
         }
     return model_config
