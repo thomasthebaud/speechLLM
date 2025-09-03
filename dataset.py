@@ -98,14 +98,14 @@ class MyCollator:
         return output
 
 class AudioDataset(Dataset):
-    def __init__(self, csv_file, mode='train', random_keys_prob=0.001, max_len = 60, max_size=-1):
+    def __init__(self, csv_file, mode='train', random_keys_prob=0.001, max_len = -1, max_size=-1):
         self.data_frame = pd.read_csv(csv_file)
         if max_size>0 and len(self.data_frame) > max_size : self.data_frame = self.data_frame.sample(n=max_size)
         self.data_frame = self.data_frame.sample(frac=1, random_state=42).reset_index(drop=True)
         self.mode = mode
         self.random_keys_prob = random_keys_prob
         self.labels = ['transcript', 'gender', 'emotion', 'age', 'accent', 'noises', 'summary'] #'isspeech', 
-        self.max_len = max_len*16_000
+        self.max_len = max_len*16_000 if max_len>0 else max_len
         # datasets = list(self.data_frame['dataset'])
         # dataset_to_index = {d:i for i,d in enumerate(set(datasets))}
         # dataset_indices = np.array([dataset_to_index[d] for d in datasets])
@@ -128,7 +128,7 @@ class AudioDataset(Dataset):
             waveform, sample_rate = torchaudio.load(audio_path)
 
         if waveform.shape[0]==2:waveform=torch.mean(waveform, axis=0).unsqueeze(0)
-        if waveform.shape[1]>self.max_len: 
+        if waveform.shape[1]>self.max_len and self.max_len>0: 
             start = int(np.random.rand(1)*(waveform.shape[1]-self.max_len))
             waveform=waveform[:, start:start+self.max_len]
             print(f"DEBUG: shape after truncate: {waveform.shape}")
@@ -162,7 +162,7 @@ class AudioDataset(Dataset):
         return waveform, labels_str, conv_history
     
 class InstructionalAudioDataset(AudioDataset):
-    def __init__(self, csv_file, mode='train', random_keys_prob=0.1, max_len = 60, max_size=-1):
+    def __init__(self, csv_file, mode='train', random_keys_prob=0.1, max_len = -1, max_size=-1):
         """
         Initialize the class with the specified CSV file, mode, and random keys probability.
 
@@ -258,7 +258,7 @@ class InstructionalAudioDataset(AudioDataset):
         return waveform, pre_speech_prompt, post_speech_prompt, output_prompt, complete_prompt
 
 class CompositeAudioDataset(Dataset):
-    def __init__(self, list_of_datasets, mode='train', random_keys_prob=0.1, max_len = 60, max_size=-1):
+    def __init__(self, list_of_datasets, mode='train', random_keys_prob=0.1, max_len = -1, max_size=-1):
         datasets = []
         for data_name in list_of_datasets:
             data = InstructionalAudioDataset(

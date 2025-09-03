@@ -22,7 +22,6 @@ python3 train.py \
     --llm 'TinyLlama-1.1B-Chat-v1.0' \
     --batch-size 1 \
     --lr 0.00001 \
-    --truncate-sec 600 \
     --use-summaries \
     --connector-k 2 \
     --meanpool 10

@@ -10,7 +10,7 @@ import pandas as pd
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model-name', default='wavlm-base-plus-cnn-TinyLlama-bs1_ft_encoder_lr0.0001')  
+    parser.add_argument('--model-name', default='wavlm-base-plus-cnn-TinyLlama-bs1_sum_mp10_str2_lr1e-05')  
     args = parser.parse_args()
     model_name = args.model_name
     metrics = {}
@@ -25,18 +25,20 @@ if __name__=="__main__":
                 outputs = f.readlines()
             outputs = [l.strip('\n').replace("', '", "\", \"").replace("': '", "\": \"").replace("': \"", "\": \"").replace("\": '", "\": \"").replace("'}", "\"}").replace("{'", "{\"").replace("\", '", "\", \"").replace("', \"", "\", \"") for l in outputs]
 
-            hyp = [l.split('INFO - [TARGET]')[1] for l in outputs if 'INFO - [TARGET]' in l]
-            pred = [l.split('INFO - [PREDICTION]')[1] for l in outputs if 'INFO - [PREDICTION]' in l]
-            assert len(hyp)==len(pred)
-            try:
-                hyp = [json.loads(fr"{original_string}") for original_string in hyp]
-                pred = [json.loads(fr"{original_string}") for original_string in pred]
-            except:
-                for original_string in pred:
-                    print(original_string)
-                    print(json.loads(fr"{original_string}"))
+            hyp_ = [l.split('INFO - [TARGET]')[1] for l in outputs if 'INFO - [TARGET]' in l]
+            pred_ = [l.split('INFO - [PREDICTION]')[1] for l in outputs if 'INFO - [PREDICTION]' in l]
+            assert len(hyp_)==len(pred_)
+            hyp, pred = [], []
+            for original_hyp, original_pred in zip(hyp_, pred_):
+                try:
+                    hyp.append(json.loads(fr"{original_hyp}"))
+                    pred.append(json.loads(fr"{original_pred}"))
+                except:
+                    print(f"Failed to process:\nhyp:{original_hyp}\npred:{original_pred}")
+                    continue
             
             keys = hyp[0].keys()
+            print(keys)
             outputs = {key:{'pred':[], 'hyp':[], 'miss':0} for key in keys}
             for h, p in zip(hyp, pred):
                 for key in h:

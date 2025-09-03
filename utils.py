@@ -10,8 +10,9 @@ def get_model_config():
     parser.add_argument('--connector-dim', default=512, type=int)
     parser.add_argument('--connector-layers', default=1, type=int)
     parser.add_argument('--batch-size', default=16, type=int)
-    parser.add_argument('--truncate-sec', default=60, type=int)
+    parser.add_argument('--truncate-sec', default=-1, type=int)
     parser.add_argument('--lr', default=1.0)
+    parser.add_argument('--encoder-lr', default=-1)
     parser.add_argument("--no-lora", action='store_true')
     parser.add_argument("--ft-encoder", action='store_true')
     parser.add_argument("--use-summaries", action='store_true')
@@ -30,6 +31,7 @@ def get_model_config():
     if args.use_summaries: model_name = model_name+'_sum'
     if args.no_lora: model_name = model_name+'_nolora'
     if args.ft_encoder: model_name = model_name+'_ft_encoder'
+    if args.encoder_lr==-1: args.encoder_lr = args.lr/50
     if args.meanpool!=1: model_name = model_name+f'_mp{args.meanpool}'
     if lr == 1.0: lr = 1e-4 if 'linear' not in args.connector else 1e-5
     if args.connector=='cnn':
@@ -91,6 +93,7 @@ def get_model_config():
                 'lora_r': 8,
                 'lora_alpha': 16,
                 'max_lr': lr,
+                'enc_lr': args.encoder_lr,
                 'batch_size':batch_size,
                 'total_training_epoch': 1000,
                 'warmup_steps': 100,

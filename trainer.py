@@ -36,6 +36,7 @@ class SpeechLLMLightning(pl.LightningModule):
                  lora_r=32,
                  lora_alpha=2,
                  max_lr=3e-4,
+                 enc_lr=2e-6,
                  total_training_step=500000,
                  warmup_steps=1000,
                  **kwargs
@@ -54,6 +55,7 @@ class SpeechLLMLightning(pl.LightningModule):
         self.llm_tokenizer, self.llm_model = get_llm(llm_name, use_lora, lora_r, lora_alpha)
         
         self.max_lr = max_lr
+        self.enc_lr = enc_lr
         self.total_training_step = total_training_step
         self.warmup_steps = warmup_steps
         self.use_embedding_loss = False
@@ -64,7 +66,7 @@ class SpeechLLMLightning(pl.LightningModule):
 
     def configure_optimizers(self):
         opt = [
-            {"params": self.audio_encoder.parameters(), "lr": self.max_lr/50 if self.finetune_encoder else 0},
+            {"params": self.audio_encoder.parameters(), "lr": self.enc_lr if self.finetune_encoder else 0},
             {"params": self.connector.parameters(), "lr": self.max_lr},
             {"params": self.llm_model.parameters(), "lr": self.max_lr if self.use_lora else 0},
         ]
