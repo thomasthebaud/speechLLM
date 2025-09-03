@@ -22,7 +22,7 @@ python3 test.py \
     --llm 'TinyLlama-1.1B-Chat-v1.0' \
     --batch-size 1 \
     --lr 0.0001 \
-    --epoch 97 \
+    --epoch-to-test 97 \
     --use-summaries \
     --connector-k 2 \
     --meanpool 10

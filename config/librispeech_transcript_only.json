@@ -1,0 +1,16 @@
+
+{
+    "train":
+    {
+        "librispeech_train-clean-100":["transcript"]
+    },
+    "dev":
+    {
+        "librispeech_dev-clean":["transcript"],
+    },
+    "test":
+    {
+        "librispeech_test-clean":["transcript"],
+        "librispeech_test-other":["transcript"]
+    }        
+}

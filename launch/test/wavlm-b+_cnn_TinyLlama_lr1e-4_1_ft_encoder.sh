@@ -23,4 +23,4 @@ python3 test.py \
     --batch-size 1 \
     --lr 0.0001 \
     --ft-encoder \
-    --epoch 139
+    --epoch-to-test 139

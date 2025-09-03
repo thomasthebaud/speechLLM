@@ -1,0 +1,15 @@
+
+{
+    "train":
+    {
+        "iemocap_ses01-03":["emotion"],
+    },
+    "dev":
+    {
+        "iemocap_ses04":["emotion"],
+    },
+    "test":
+    {
+        "iemocap_ses05":["emotion"]
+    }        
+}

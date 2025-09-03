@@ -23,7 +23,7 @@ python3 test.py \
     --batch-size 1 \
     --lr 0.00001 \
     --truncate-sec 600 \
-    --epoch 115 \
+    --epoch-to-test 115 \
     --use-summaries \
     --connector-k 2 \
     --meanpool 10

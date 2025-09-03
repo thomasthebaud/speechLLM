@@ -21,4 +21,4 @@ python3 test.py \
     --connector 'cnn' \
     --llm 'TinyLlama-1.1B-Chat-v1.0' \
     --batch-size 1 \
-    --epoch 67
+    --epoch-to-test 67

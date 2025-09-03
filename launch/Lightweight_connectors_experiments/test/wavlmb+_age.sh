@@ -6,8 +6,8 @@
 #SBATCH --gpus=1  #number of gpus requested
 #SBATCH --partition=gpu-a100   #queue
 #SBATCH --account=a100acct
-#SBATCH --error=logs/train/wavlm-base-plus_linear_TinyLlama_lr1e-3_gender_%j.log
-#SBATCH --output=logs/train/wavlm-base-plus_linear_TinyLlama_lr1e-3_gender_%j.log
+#SBATCH --error=logs/test/wavlm-base-plus_linear_TinyLlama_lr1e-3_age_%j.log
+#SBATCH --output=logs/test/wavlm-base-plus_linear_TinyLlama_lr1e-3_age_%j.log
 #SBATCH --exclude=e05
 
 export HF_HOME=./hf_cache/
@@ -17,7 +17,7 @@ export HF_DATASETS_CACHE=./hf_cache/
 
 export 'PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512'
 
-python3 train.py \
+python3 test.py \
     --encoder 'microsoft/wavlm-base-plus' \
     --connector 'linear' \
     --llm 'TinyLlama-1.1B-Chat-v1.0' \
@@ -26,6 +26,6 @@ python3 train.py \
     --truncate-sec 60 \
     --connector-k 20 \
     --lr 0.001 \
-    --use-config voxceleb2_gender_only.json \
+    --use-config voxceleb2_age_only.json \
     --group 'Lightweight_connectors_reproduction' \
-    --total-training-epoch 10
+    --epoch-to-test 10
