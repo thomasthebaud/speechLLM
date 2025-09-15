@@ -1,0 +1,14 @@
+{
+    "train":
+    {
+        "voxceleb2_enriched_dev":["age", "gender"]
+    },
+    "dev":
+    {
+        "voxceleb2_enriched_test":["age", "gender"]
+    },
+    "test":
+    {
+        "voxceleb2_enriched_test":["age", "gender"]
+    }        
+}

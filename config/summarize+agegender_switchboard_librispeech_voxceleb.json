@@ -1,0 +1,23 @@
+
+{
+    "train":
+    {
+        "switchboard_train":["summary"],
+        "voxceleb2_enriched_dev":["age", "gender"],
+        "librispeech_train-clean-360":["transcript", "gender"]
+    },
+    "dev":
+    {
+        "switchboard_val":["summary"],
+        "voxceleb2_enriched_test":["age", "gender"],
+        "librispeech_dev-clean":["transcript", "gender"],
+        "librispeech_dev-other":["transcript", "gender"]
+    },
+    "test":
+    {
+        "switchboard_test":["summary"],
+        "voxceleb2_enriched_test":["age", "gender"],
+        "librispeech_test-clean":["transcript", "gender"],
+        "librispeech_test-other":["transcript", "gender"]
+    }        
+}

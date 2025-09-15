@@ -10,18 +10,18 @@ import pandas as pd
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model-name', default='wavlm-base-plus-cnn-TinyLlama-bs1_sum_mp10_str2_lr0.0001')  
+    parser.add_argument('--model-name', default='A_wavlm-base-plus-cnn-TinyLlama-bs1_mp10_str2_lr0.0001sum+T.A.G.Ac.E')  
     args = parser.parse_args()
     model_name = args.model_name
     metrics = {}
-    rouge_scorer_ = rouge_scorer.RougeScorer(['rouge1', 'rougeL'], use_stemmer=True)
+    rouge_scorer_ = rouge_scorer.RougeScorer(['rouge1', 'rougeL', 'rouge2'], use_stemmer=True)
     for dataset in os.listdir(f"exp/test_predictions/{model_name}"):
         if dataset[-4:]=='.csv':continue
         metrics[dataset]={}
-        for output_file in os.listdir(f"exp/test_predictions/{model_name}/{dataset}"):
+        for output_file in os.listdir(f"exp/test_predictions/{model_name}/{dataset}/A"):
             model_epoch=output_file[len(model_name):-4]
             metrics[dataset][model_epoch]={}
-            with open(f"exp/test_predictions/{model_name}/{dataset}/{output_file}", 'r') as f:
+            with open(f"exp/test_predictions/{model_name}/{dataset}/A/{output_file}", 'r') as f:
                 outputs = f.readlines()
             outputs = [l.strip('\n').replace("', '", "\", \"").replace("': '", "\": \"").replace("': \"", "\": \"").replace("\": '", "\": \"").replace("'}", "\"}").replace("{'", "{\"").replace("\", '", "\", \"").replace("', \"", "\", \"") for l in outputs]
 
@@ -66,8 +66,10 @@ if __name__=="__main__":
                     ]
                 rouge_1 = [r_scores['rouge1'].precision for r_scores in scorer_list]
                 rouge_L = [r_scores['rougeL'].precision for r_scores in scorer_list]
+                rouge_2 = [r_scores['rouge2'].precision for r_scores in scorer_list]
                 metrics[dataset][model_epoch]['Rouge_1_Summary'] = np.mean(rouge_1)
                 metrics[dataset][model_epoch]['Rouge_L_Summary'] = np.mean(rouge_L)
+                metrics[dataset][model_epoch]['Rouge_2_Summary'] = np.mean(rouge_2)
 
             if 'Age' in outputs:
                 age_list = [
@@ -108,8 +110,12 @@ if __name__=="__main__":
         outputs = {field:['']*len(metrics) for field in all_fields}
         outputs['dataset'] = list(metrics.keys())
         for i,dataset in enumerate(list(metrics.keys())):
-            for metric in metrics[dataset][model_epoch]:
-                outputs[metric][i] = metrics[dataset][model_epoch][metric]
+            
+            try:
+                for metric in metrics[dataset][model_epoch]:
+                    outputs[metric][i] = metrics[dataset][model_epoch][metric]
+            except:
+                print(dataset, metrics[dataset])
         outputs_df = pd.DataFrame(outputs)
         outputs_df = outputs_df[['dataset']+all_fields]
         print(model_epoch)

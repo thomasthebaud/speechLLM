@@ -35,12 +35,15 @@ def get_model_config():
     parser.add_argument('--encoder-lr', default=-1)
     parser.add_argument("--no-lora", action='store_true')
     parser.add_argument("--ft-encoder", action='store_true')
-    parser.add_argument("--use-summaries", action='store_true')
+    parser.add_argument("--use-text", action='store_true')
+    parser.add_argument("--prob-text", default=0.5, type=float)
+    parser.add_argument("--no-audio", action='store_true')
     parser.add_argument('--epoch-to-test', default=1, type=int)
     parser.add_argument("--meanpool", default=1, type=int)
     parser.add_argument("--total-training-epoch", default=1000, type=int)
     parser.add_argument("--use-config", default=None, type=str)
     parser.add_argument("--group", default='August experiments', type=str)
+    parser.add_argument("--nickname", default='_', type=str)
 
     args = parser.parse_args()
 
@@ -51,8 +54,16 @@ def get_model_config():
 
     # Model naming
     model_name = f"{args.encoder.split('/')[-1]}-{args.connector}-{args.llm.split('-')[0]}-bs{batch_size}"
-    if args.use_summaries: model_name = model_name+'_sum'
     if args.no_lora: model_name = model_name+'_nolora'
+
+    if args.use_text:
+        model_name = model_name + f"_p{float(args.prob_text)}"
+        if args.no_audio: model_name = 'T_'+model_name
+        else: model_name = 'AT_'+model_name
+    else:
+        if args.no_audio: exit("not using text nor audio!")
+        else: model_name = 'A_'+model_name
+
     if args.ft_encoder: model_name = model_name+'_ft_encoder'
     if args.encoder_lr==-1: args.encoder_lr = float(args.lr)/50
     if args.meanpool!=1: model_name = model_name+f'_mp{args.meanpool}'
@@ -62,6 +73,7 @@ def get_model_config():
         model_name = model_name+f'_str{stride}'
     model_name =  f"{model_name}_lr{lr}"
 
+    if args.nickname!='_': model_name = model_name + str(args.nickname)
     # Wandb params
     log_path = 'logs/'+model_name
     group = args.group
@@ -94,6 +106,9 @@ def get_model_config():
                 'connector_layers': int(args.connector_layers),
                 'meanpool':int(args.meanpool),
                 'use_lora': use_lora,
+                'use_text':args.use_text,
+                'prob_text':float(args.prob_text),
+                'use_audio':not args.no_audio,
                 'lora_r': 8,
                 'lora_alpha': 16,
                 'max_lr': lr,
@@ -112,6 +127,5 @@ def get_model_config():
                 'group':group,
                 'model_name':model_name,
                 'epoch_to_test':int(args.epoch_to_test)
-
         }
     return model_config

@@ -20,6 +20,14 @@ from rouge_score import rouge_scorer
 # from evaluate import load
 import logging
 
+class MeanPooler(nn.Module):
+    def __init__(self, k):
+        super().__init__()
+        self.pool = nn.AvgPool1d(kernel_size=k, stride=k)
+
+    def forward(self, x):
+        return self.pool(x.transpose(1, 2)).transpose(1, 2)
+
 class SpeechLLMLightning(pl.LightningModule):
     def __init__(self, 
                  audio_enc_dim=512, 
@@ -28,6 +36,7 @@ class SpeechLLMLightning(pl.LightningModule):
                  connector_name='linear-pool',
                  llm_name="TinyLlama/TinyLlama-1.1B-Chat-v1.0", 
                  finetune_encoder=False,
+                 use_audio=True,
                  connector_k=5,
                  connector_dim=512,
                  connector_layers=1,
@@ -47,11 +56,12 @@ class SpeechLLMLightning(pl.LightningModule):
         self.audio_enc_dim = audio_enc_dim
         self.llm_dim = llm_dim
         self.llm_name = llm_name
-        self.finetune_encoder = finetune_encoder
+        self.finetune_encoder = finetune_encoder and use_audio
         self.use_lora = use_lora
 
         self.audio_encoder = get_audio_encoder(audio_encoder_name, finetune_encoder)
-        self.connector = get_connector(connector_name, audio_enc_dim, llm_dim, connector_k, connector_dim, connector_layers, meanpool=meanpool)
+        self.connector = get_connector(connector_name, audio_enc_dim, llm_dim, connector_k, connector_dim, connector_layers)
+        self.pooling = MeanPooler(k=meanpool)
         self.llm_tokenizer, self.llm_model = get_llm(llm_name, use_lora, lora_r, lora_alpha)
         
         self.max_lr = max_lr
@@ -60,14 +70,15 @@ class SpeechLLMLightning(pl.LightningModule):
         self.warmup_steps = warmup_steps
         self.use_embedding_loss = False
         self.num_validation_samples = 5000
+        self.use_audio = use_audio
 
-        self.rouge_scorer = rouge_scorer.RougeScorer(['rouge1', 'rougeL'], use_stemmer=True)
+        self.rouge_scorer = rouge_scorer.RougeScorer(['rouge1', 'rougeL', 'rouge2'], use_stemmer=True)
         # self.bert_scorer = load("bertscore")
 
     def configure_optimizers(self):
         opt = [
-            {"params": self.audio_encoder.parameters(), "lr": self.enc_lr if self.finetune_encoder else 0},
-            {"params": self.connector.parameters(), "lr": self.max_lr},
+            {"params": self.audio_encoder.parameters(), "lr": self.enc_lr if (self.finetune_encoder and self.use_audio) else 0},
+            {"params": self.connector.parameters(), "lr": self.max_lr if self.use_audio else 0},
             {"params": self.llm_model.parameters(), "lr": self.max_lr if self.use_lora else 0},
         ]
         optimizer = Adam(opt, lr=self.max_lr)
@@ -80,42 +91,47 @@ class SpeechLLMLightning(pl.LightningModule):
             with torch.no_grad():
                 speech_embeds = self.audio_encoder(mel)
         # print(f"encoded size: {speech_embeds.shape}")
-        return self.connector(speech_embeds)
+        return speech_embeds
 
     def encode(self, mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids, return_embedding_loss=False, chunk_size=60*16_000):
         batch_size = mel.shape[0]
         
         #use chunks of size 1min max
         # print(f"{mel.shape}")
-        if mel.shape[1]<chunk_size:
-            speech_embeds = self.encode_speech_segment(mel)
-        else:
-            chunks = mel.split(chunk_size, dim=1)
-            outs = []
-            for c in chunks:
-                # print(f"{mel.shape}, {c.shape}")
-                # if c.shape[1]>4000: 
-                try:
-                    outs.append(self.encode_speech_segment(c))
-                except:
-                    print(f"Failed: {mel.shape}, {c.shape}")
-            speech_embeds = torch.cat(outs, dim=1)
-            # print(f"{mel.shape}, {speech_embeds.shape}")
-            del mel
-            del chunks
-            del outs
+        if self.use_audio:
+            if mel.shape[1]<chunk_size:
+                speech_embeds = self.encode_speech_segment(mel)
+            else:
+                chunks = mel.split(chunk_size, dim=1)
+                outs = []
+                for c in chunks:
+                    if c.shape[1]>=16_000: #WavLM needs at least one second of audio
+                        outs.append(self.encode_speech_segment(c))
+                speech_embeds = torch.cat(outs, dim=1)
+                # print(f"{mel.shape}, {speech_embeds.shape}")
+                del mel
+                del chunks
+                del outs
 
-        
+            speech_embeds = self.connector(self.pooling(speech_embeds))
+
+
         if self.use_lora: embedder = self.llm_model.model.model.embed_tokens
         else: embedder = self.llm_model.model.embed_tokens
+
         pre_prompt_embeds = embedder(pre_tokenized_ids)
         post_prompt_embeds = embedder(post_tokenized_ids)
         output_prompt_embeds = embedder(output_tokenized_ids)
 
-        combined_embeds = torch.cat([pre_prompt_embeds, speech_embeds, post_prompt_embeds, output_prompt_embeds], dim=1)
+        if self.use_audio: 
+            combined_embeds = torch.cat([pre_prompt_embeds, speech_embeds, post_prompt_embeds, output_prompt_embeds], dim=1)
+            input_token_length = pre_tokenized_ids.shape[1] + speech_embeds.shape[1] + post_tokenized_ids.shape[1]
+        else:
+            combined_embeds = torch.cat([pre_prompt_embeds, post_prompt_embeds, output_prompt_embeds], dim=1)
+            input_token_length = pre_tokenized_ids.shape[1] + post_tokenized_ids.shape[1]
+
         atts = torch.ones(combined_embeds.size()[:-1], dtype=torch.long).to(combined_embeds.device)
 
-        input_token_length = pre_tokenized_ids.shape[1] + speech_embeds.shape[1] + post_tokenized_ids.shape[1]
         label_ids = torch.cat([
             torch.ones([batch_size, input_token_length], device=combined_embeds.device)*-100,
             output_tokenized_ids
@@ -195,6 +211,7 @@ class SpeechLLMLightning(pl.LightningModule):
 
         self.get_keys_and_log(extracted_pred, extracted_target, v='test')
         logging.info(f"[PREDICTION]\t{extracted_pred}")
+        logging.info(f"[RAW OUTPUT]\t{generated_output_text}")
         logging.info(f"[TARGET]\t{extracted_target}")
 
         return {"test_loss": 0}
@@ -256,6 +273,7 @@ class SpeechLLMLightning(pl.LightningModule):
             r_scores = self.rouge_scorer.score(target_sum,predicted_sum)
             # b_scores = self.bert_scorer.compute(predictions=predicted_sum, references=target_sum, lang="en")
             self.log(f"{v}/summary/rouge_1", r_scores['rouge1'].precision, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+            self.log(f"{v}/summary/rouge_2", r_scores['rouge2'].precision, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
             self.log(f"{v}/summary/rouge_L", r_scores['rougeL'].precision, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
             # self.log(f"{v}/summary/BertScore", b_scores.precision, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
 

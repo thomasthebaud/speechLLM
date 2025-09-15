@@ -98,7 +98,7 @@ class MyCollator:
         return output
 
 class AudioDataset(Dataset):
-    def __init__(self, csv_file, mode='train',random_keys_prob=0.001, max_len = -1, max_size=-1, fields=[]):
+    def __init__(self, csv_file, mode='train',random_keys_prob=0.001, max_len = -1, max_size=-1, fields=[], use_text=False):
         self.data_frame = pd.read_csv(csv_file)
         if max_size>0 and len(self.data_frame) > max_size : self.data_frame = self.data_frame.sample(n=max_size)
         self.data_frame = self.data_frame.sample(frac=1, random_state=42).reset_index(drop=True)
@@ -107,6 +107,8 @@ class AudioDataset(Dataset):
         else: self.labels = fields
         self.max_len = max_len*16_000
         self.random_keys_prob=random_keys_prob
+        self.use_text=use_text
+        if self.use_text and 'transcript' in self.labels: print("Warning: You should not give transcripts and ask to predict them, that could be counter-productive.")
         # datasets = list(self.data_frame['dataset'])
         # dataset_to_index = {d:i for i,d in enumerate(set(datasets))}
         # dataset_indices = np.array([dataset_to_index[d] for d in datasets])
@@ -154,16 +156,20 @@ class AudioDataset(Dataset):
                     else:
                         labels_str[formatted_label] = str(audio_row[label]).lower()
 
-        
+        if self.use_text and 'transcript' in audio_row:
+            transcript = audio_row['transcript']
+        else:
+            transcript = ""
+
         if 'context' in audio_row.index:
             conv_history = audio_row['context']
         else:
             conv_history = ""
         
-        return waveform, labels_str, conv_history
+        return waveform, labels_str, conv_history, transcript
     
 class InstructionalAudioDataset(AudioDataset):
-    def __init__(self, csv_file, mode='train',random_keys_prob=0.001,  max_len = -1, max_size=-1, fields=[]):
+    def __init__(self, csv_file, mode='train',random_keys_prob=0.001,  max_len = -1, max_size=-1, fields=[], use_text=False, prob_text=0.5):
         """
         Initialize the class with the specified CSV file, mode, and random keys probability.
 
@@ -173,7 +179,9 @@ class InstructionalAudioDataset(AudioDataset):
         Returns:
             None
         """
-        super().__init__(csv_file, mode, random_keys_prob=random_keys_prob, max_len = max_len, max_size=max_size, fields=fields)
+        self.use_text = use_text
+        self.prob_text = prob_text
+        super().__init__(csv_file, mode, random_keys_prob=random_keys_prob, max_len = max_len, max_size=max_size, fields=fields, use_text=use_text)
         self.instruction_phrases = [
             "Provide the details about the audio",
             "I need the following information from the audio",
@@ -239,14 +247,18 @@ class InstructionalAudioDataset(AudioDataset):
         ]
     
     def __getitem__(self, idx):
-        waveform, labels_str, conv_history = super().__getitem__(idx)
+        waveform, labels_str, conv_history, transcript = super().__getitem__(idx)
         instruction_phrase = random.choice(self.instruction_phrases)
 
         pre_speech_prompt = f"Instruction:\n{instruction_phrase} - ["
         pre_speech_prompt += ', '.join(['IsSpeech' if k == 'isSpeech' else k for k in labels_str.keys()]) + "]\n\nInput:\n<speech>"
         pre_speech_prompt = pre_speech_prompt.replace("Isspeech", "SpeechActivity")
-        post_speech_prompt = f"</speech>\n\n" + \
+        if self.use_text and random.random() < self.prob_text:
+            post_speech_prompt = f"</speech>\n\n<transcript>{transcript}</transcript>\n\n" + \
              "Output:\n"
+        else:
+            post_speech_prompt = f"</speech>\n\n" + \
+                "Output:\n"
         output_prompt = "{"
         for key, value in labels_str.items():
             if key=="Isspeech": key = 'SpeechActivity'
@@ -257,7 +269,7 @@ class InstructionalAudioDataset(AudioDataset):
         return waveform, pre_speech_prompt, post_speech_prompt, output_prompt, complete_prompt
 
 class CompositeAudioDataset(Dataset):
-    def __init__(self, list_of_datasets, mode='train', random_keys_prob=0.001, max_len = -1, max_size=-1):
+    def __init__(self, list_of_datasets, mode='train', random_keys_prob=0.001, max_len = -1, max_size=-1, use_text=False, prob_text=0.5):
         datasets = []
         for data_name in list_of_datasets:
             data = InstructionalAudioDataset(
@@ -266,7 +278,9 @@ class CompositeAudioDataset(Dataset):
                         random_keys_prob=random_keys_prob,
                         max_len=max_len,
                         max_size=max_size,
-                        fields=list_of_datasets[data_name]
+                        fields=list_of_datasets[data_name],
+                        use_text=use_text,
+                        prob_text=prob_text
                         )
             datasets.append(data)
             print(f"Loaded {data_name}, length = {len(data)}")

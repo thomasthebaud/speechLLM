@@ -4,7 +4,6 @@
     {
         "iemocap_ses01-03":["emotion", "gender"],
         "CV-EN_train":["accent", "transcript", "gender"],
-        "MSP_Podcast_Train":["emotion", "gender"],
         "voxceleb2_enriched_dev":["age", "gender"],
         "librispeech_train-clean-360":["transcript", "gender"]
     },
@@ -12,7 +11,6 @@
     {
         "iemocap_ses04":["emotion"],
         "CV-EN_dev":["accent"],
-        "MSP_Podcast_Validation":["emotion"],
         "voxceleb2_enriched_test":["age", "gender"],
         "librispeech_dev-clean":["transcript"],
         "librispeech_dev-other":["transcript"]
@@ -21,7 +19,6 @@
     {
         "iemocap_ses05":["emotion"],
         "CV-EN_test":["accent"],
-        "MSP_Podcast_Test":["emotion"],
         "voxceleb2_enriched_test":["age", "gender"],
         "librispeech_test-clean":["transcript"],
         "librispeech_test-other":["transcript"]

@@ -30,14 +30,18 @@ if __name__ == "__main__":
         list_of_datasets=model_config['train_sets'],
         mode='train', 
         random_keys_prob=0.2,
-        max_len=model_config['max_number_seconds']
+        max_len=model_config['max_number_seconds'],
+        use_text=model_config['use_text'],
+        prob_text=model_config['prob_text']
         )
 
     val_dataset = CompositeAudioDataset(
         list_of_datasets = model_config['dev_sets'],
         mode='test',
         max_len=model_config['max_number_seconds'],
-        max_size=model_config['max_size_per_dev_set']
+        max_size=model_config['max_size_per_dev_set'],
+        use_text=model_config['use_text'],
+        prob_text=model_config['prob_text']
         )
 
     print(f"Train set:{len(train_dataset)}, val set:{len(val_dataset)}, batch size:{model_config['batch_size']}")
@@ -70,12 +74,22 @@ if __name__ == "__main__":
                     monitor="val/loss", 
                     save_last=True,
                     every_n_epochs=2)
+    # checkpoint_callback = ModelCheckpoint(
+    #                 dirpath=f"checkpoints/{model_config['model_name']}", 
+    #                 filename=model_config['model_name']+'epoch-{epoch}', 
+    #                 save_top_k=3, 
+    #                 mode="max",
+    #                 monitor="val/summary/rouge_1", 
+    #                 save_last=True,
+    #                 every_n_epochs=2)
+
     early_stop_callback = EarlyStopping(monitor="val/loss", min_delta=0.00, patience=10, verbose=False, mode="min")
+    # early_stop_callback = EarlyStopping(monitor="val/summary/rouge_1", min_delta=0.00, patience=10, verbose=False, mode="max")
 
     trainer = Trainer(
             max_epochs=model_config['total_training_epoch'], 
             devices=1, accelerator="gpu", 
-            strategy=DDPStrategy(find_unused_parameters=model_config['finetune_encoder']),
+            strategy=DDPStrategy(find_unused_parameters=True),#model_config['finetune_encoder']
             limit_train_batches=model_config['train_batch_per_epoch'], 
             log_every_n_steps=100, 
             enable_checkpointing=True, 

@@ -1,0 +1,14 @@
+{
+    "train":
+    {
+        "switchboard_train":["summary"]
+    },
+    "dev":
+    {
+        "switchboard_val":["summary"]
+    },
+    "test":
+    {
+        "switchboard_test":["summary"]
+    }        
+}
