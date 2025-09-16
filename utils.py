@@ -29,6 +29,7 @@ def get_model_config():
     parser.add_argument('--llm')  
     parser.add_argument('--connector-k', default=2, type=int)
     parser.add_argument('--connector-dim', default=512, type=int)
+    parser.add_argument('--encoder-dim', default=768, type=int)
     parser.add_argument('--connector-layers', default=1, type=int)
     parser.add_argument('--batch-size', default=16, type=int)
     parser.add_argument('--truncate-sec', default=-1, type=int)
@@ -81,13 +82,11 @@ def get_model_config():
     group = args.group
 
     # Encoder
-    if "wavlm" in args.encoder: 
-        audio_encoder_name=args.encoder
-        audio_enc_dim = 768
-    elif 'MFCC' in args.encoder:
-        audio_encoder_name=args.encoder
+    audio_encoder_name=args.encoder
+    if args.encoder=='MFCC':
         audio_enc_dim = 80
-    else: exit(f"Uknown encoder reference: {args.encoder}")
+    else:
+        audio_enc_dim = int(args.encoder_dim)
     
     # LLM
     if args.llm=='TinyLlama-1.1B-Chat-v1.0':llm_name="TinyLlama/TinyLlama-1.1B-Chat-v1.0"
