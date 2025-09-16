@@ -8,15 +8,17 @@ from sklearn.metrics import f1_score, accuracy_score
 import pandas as pd
 
 if __name__=="__main__":
-    for mp in ['2', '5', '20', '50']:
-        model_name = f'A_wavlm-base-plus-cnn-TinyLlama-bs1_mp{mp}_str2_lr0.0001'
+    for p in ['0.01', '0.1', '0.5', '1']:
+        model_name = f'AT_wavlm-base-plus-cnn-TinyLlama-bs1_p{p}_mp10_str2_lr0.0001'
         metrics = {}
         rouge_scorer_ = rouge_scorer.RougeScorer(['rouge1', 'rouge2', 'rougeL'], use_stemmer=True)
-        print(f"MP = {mp}")
+        print(f"########  prop text = {p}  #######")
+        if not os.path.exists(f"exp/test_predictions/{model_name}"):model_name=model_name+f"_p{p}"
         for dataset in os.listdir(f"exp/test_predictions/{model_name}"):
             if dataset[-4:]=='.csv' or 'switch' not in dataset:continue
             metrics[dataset]={}
             for AT in os.listdir(f"exp/test_predictions/{model_name}/{dataset}/"):
+                print(f"Audio or Text: {AT}")
                 for output_file in os.listdir(f"exp/test_predictions/{model_name}/{dataset}/{AT}/"):
                     model_epoch=output_file[len(model_name):-4]
                     metrics[dataset][model_epoch]={}
@@ -52,34 +54,7 @@ if __name__=="__main__":
                     rouge_1 = [r_scores['rouge1'].precision for r_scores in scorer_list]
                     rouge_L = [r_scores['rougeL'].precision for r_scores in scorer_list]
                     rouge_2 = [r_scores['rouge2'].precision for r_scores in scorer_list]
-                    metrics[dataset][model_epoch]['Rouge_1_Summary'] = np.mean(rouge_1)
-                    metrics[dataset][model_epoch]['Rouge_L_Summary'] = np.mean(rouge_L)
-                    metrics[dataset][model_epoch]['Rouge_2_Summary'] = np.mean(rouge_2)
-
-                # print(dataset)
-                # print(metrics[dataset])
-                # print()
-
-        all_fields = []
-        all_epochs = []
-        for dataset in metrics:
-            for epoch in metrics[dataset]:
-                all_epochs.append(epoch)
-                for metric in metrics[dataset][epoch]:
-                    all_fields.append(metric)
-        all_fields=sorted(list(set(all_fields)))
-        all_epochs=sorted(list(set(all_epochs)))
-        for model_epoch in all_epochs:
-            outputs = {field:['']*len(metrics) for field in all_fields}
-            outputs['dataset'] = list(metrics.keys())
-            for i,dataset in enumerate(list(metrics.keys())):
-                for metric in metrics[dataset][model_epoch]:
-                    outputs[metric][i] = metrics[dataset][model_epoch][metric]
-            outputs_df = pd.DataFrame(outputs)
-            outputs_df = outputs_df[['dataset']+all_fields]
-            print(model_epoch)
-            print(outputs_df)
-            outputs_df.to_csv(f"exp/test_predictions/{model_name}/metrics_{model_epoch}.csv", index=False)
+                    print(f"Epoch {model_epoch}- Rouge1 {100*np.mean(rouge_1):.2f}\tRouge2 {100*np.mean(rouge_2):.2f}\tRougeL {100*np.mean(rouge_L):.2f}")
 
             
             

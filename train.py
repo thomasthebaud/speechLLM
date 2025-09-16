@@ -5,6 +5,7 @@ from pytorch_lightning.loggers import WandbLogger
 from trainer import SpeechLLMLightning
 from dataset import InstructionalAudioDataset, MyCollator, CompositeAudioDataset, make_weighted_sampler_from_dataset
 from pytorch_lightning.strategies import DDPStrategy
+from pytorch_lightning.callbacks import TQDMProgressBar
 
 import torch.utils.data as data_utils
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
@@ -67,24 +68,29 @@ if __name__ == "__main__":
                         num_workers=num_workers,
                         persistent_workers=False, pin_memory=False, prefetch_factor=None) #for debugging segmentation fault
 
-    checkpoint_callback = ModelCheckpoint(
+    if model_config['use_summaries']:
+        print("Using max ROUGE avg F1 score as target")
+        checkpoint_callback = ModelCheckpoint(
                     dirpath=f"checkpoints/{model_config['model_name']}", 
                     filename=model_config['model_name']+'epoch-{epoch}', 
                     save_top_k=3, 
-                    monitor="val/loss", 
+                    mode="max",
+                    monitor="val/summary/rouge_avg_f1", 
                     save_last=True,
                     every_n_epochs=2)
-    # checkpoint_callback = ModelCheckpoint(
-    #                 dirpath=f"checkpoints/{model_config['model_name']}", 
-    #                 filename=model_config['model_name']+'epoch-{epoch}', 
-    #                 save_top_k=3, 
-    #                 mode="max",
-    #                 monitor="val/summary/rouge_1", 
-    #                 save_last=True,
-    #                 every_n_epochs=2)
+        early_stop_callback = EarlyStopping(monitor="val/summary/rouge_avg_f1", min_delta=0.00, patience=10, verbose=False, mode="max")
 
-    early_stop_callback = EarlyStopping(monitor="val/loss", min_delta=0.00, patience=10, verbose=False, mode="min")
-    # early_stop_callback = EarlyStopping(monitor="val/summary/rouge_1", min_delta=0.00, patience=10, verbose=False, mode="max")
+    else:
+        print("Using min val loss as target")
+        checkpoint_callback = ModelCheckpoint(
+                        dirpath=f"checkpoints/{model_config['model_name']}", 
+                        filename=model_config['model_name']+'epoch-{epoch}', 
+                        save_top_k=3, 
+                        monitor="val/loss", 
+                        save_last=True,
+                        every_n_epochs=2)
+        early_stop_callback = EarlyStopping(monitor="val/loss", min_delta=0.00, patience=10, verbose=False, mode="min")
+
 
     trainer = Trainer(
             max_epochs=model_config['total_training_epoch'], 
@@ -93,7 +99,8 @@ if __name__ == "__main__":
             limit_train_batches=model_config['train_batch_per_epoch'], 
             log_every_n_steps=100, 
             enable_checkpointing=True, 
-            callbacks=[checkpoint_callback],
+            enable_progress_bar=True,
+            callbacks=[checkpoint_callback, TQDMProgressBar(refresh_rate=10*model_config['grad_accumulate_steps'])],
             fast_dev_run=False, logger=logger, 
             accumulate_grad_batches=model_config['grad_accumulate_steps']
     )

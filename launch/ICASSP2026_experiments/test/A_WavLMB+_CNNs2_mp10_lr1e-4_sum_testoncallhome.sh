@@ -6,8 +6,8 @@
 #SBATCH --gpus=1  #number of gpus requested
 #SBATCH --partition=gpu-a100   #queue
 #SBATCH --account=a100acct
-#SBATCH --error=logs/test/AT_wavlm-base-plus_cnn_TinyLlama_str2_mp10_p1_%j.log
-#SBATCH --output=logs/test/AT_wavlm-base-plus_cnn_TinyLlama_str2_mp10_p1_%j.log
+#SBATCH --error=logs/test/A_wavlm-base-plus_cnn_TinyLlama_str2_mp10_Sum_CH_T.A.G_%j.log
+#SBATCH --output=logs/test/A_wavlm-base-plus_cnn_TinyLlama_str2_mp10_Sum_CH_T.A.G_%j.log
 
 export HF_HOME=./hf_cache/
 export HF_DATASETS_CACHE=./hf_cache/
@@ -22,11 +22,9 @@ python3 test.py \
     --llm 'TinyLlama-1.1B-Chat-v1.0' \
     --batch-size 1 \
     --lr 0.0001 \
-    --use-text \
-    --prob-text 1 \
     --connector-k 2 \
     --meanpool 10 \
     --group 'Summarization' \
-    --use-config summarize_switchboard.json \
-    --epoch-to-test 9
-
+    --use-config test_callhome.json \
+    --epoch-to-test 39 \
+    --nickname 'sum+T.A.G'

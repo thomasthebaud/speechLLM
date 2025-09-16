@@ -71,7 +71,7 @@ class MyCollator:
             self.pad(output_tokenized_ids).long())
 
     def process(self, element):
-        waveform, pre_speech_prompt, post_speech_prompt, output_prompt, complete_prompt = element
+        waveform, pre_speech_prompt, post_speech_prompt, output_prompt = element
 
         if waveform is not None:
             # if "openai/whisper" in self.audio_encoder_name:
@@ -265,8 +265,7 @@ class InstructionalAudioDataset(AudioDataset):
             output_prompt += f'  "{key}": "{value}", '
         output_prompt = output_prompt.rstrip(',\n') + "}"
 
-        complete_prompt = pre_speech_prompt + post_speech_prompt + output_prompt
-        return waveform, pre_speech_prompt, post_speech_prompt, output_prompt, complete_prompt
+        return waveform, pre_speech_prompt, post_speech_prompt, output_prompt
 
 class CompositeAudioDataset(Dataset):
     def __init__(self, list_of_datasets, mode='train', random_keys_prob=0.001, max_len = -1, max_size=-1, use_text=False, prob_text=0.5):

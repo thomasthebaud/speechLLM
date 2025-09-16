@@ -8,16 +8,17 @@ def get_config(args):
         "dev":['librispeech_dev-clean', 'iemocap_ses04', 'CV-EN_dev', 'MSP_Podcast_Validation', 'voxceleb2_enriched_test'],
         "test":['librispeech_test-clean', 'iemocap_ses05', 'CV-EN_test', 'MSP_Podcast_Test', 'voxceleb2_enriched_test'],
         }
-        if args.use_summaries: 
-            datasets['train'] = ['switchboard_train', 'librispeech_train-clean-360']
-            datasets['dev'] = ['switchboard_val', 'librispeech_dev-clean', 'librispeech_dev-other']
-            datasets['test'] = ['switchboard_test', 'librispeech_test-clean', 'librispeech_test-other']
-        
         datasets = {split:{data:[] for data in datasets[split]} for split in datasets} #empty list means use all available fields for that dataset
     else:
         with open(f'config/{args.use_config}', 'r') as file:
             datasets = json.load(file)
-    return datasets
+
+    use_summaries = False
+    for data in datasets['dev']:
+        if "summary" in datasets['dev'][data]:
+            use_summaries=True
+            break
+    return datasets, use_summaries
 
 
 def get_model_config():
@@ -44,6 +45,7 @@ def get_model_config():
     parser.add_argument("--use-config", default=None, type=str)
     parser.add_argument("--group", default='August experiments', type=str)
     parser.add_argument("--nickname", default='_', type=str)
+    parser.add_argument("--test-on", default='A', type=str)
 
     args = parser.parse_args()
 
@@ -91,7 +93,7 @@ def get_model_config():
     if args.llm=='TinyLlama-1.1B-Chat-v1.0':llm_name="TinyLlama/TinyLlama-1.1B-Chat-v1.0"
 
     # Datasets
-    datasets = get_config(args)
+    datasets, use_summaries = get_config(args)
 
     # Get all infos
     model_config = {
@@ -126,6 +128,8 @@ def get_model_config():
                 'log_path':log_path,
                 'group':group,
                 'model_name':model_name,
-                'epoch_to_test':int(args.epoch_to_test)
+                'epoch_to_test':int(args.epoch_to_test),
+                'use_summaries':use_summaries,
+                'test_on':str(args.test_on)
         }
     return model_config

@@ -1,0 +1,14 @@
+{
+    "train":
+    {
+        "none":["none"]
+    },
+    "dev":
+    {
+        "none":["none"]
+    },
+    "test":
+    {
+        "callhome_test_subset":["summary"]
+    }        
+}

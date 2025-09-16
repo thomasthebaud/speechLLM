@@ -93,7 +93,7 @@ class SpeechLLMLightning(pl.LightningModule):
         # print(f"encoded size: {speech_embeds.shape}")
         return speech_embeds
 
-    def encode(self, mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids, return_embedding_loss=False, chunk_size=60*16_000):
+    def encode(self, mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids, return_embedding_loss=False, chunk_size=60*16_000, test_mode=False):
         batch_size = mel.shape[0]
         
         #use chunks of size 1min max
@@ -123,13 +123,19 @@ class SpeechLLMLightning(pl.LightningModule):
         post_prompt_embeds = embedder(post_tokenized_ids)
         output_prompt_embeds = embedder(output_tokenized_ids)
 
-        if self.use_audio: 
-            combined_embeds = torch.cat([pre_prompt_embeds, speech_embeds, post_prompt_embeds, output_prompt_embeds], dim=1)
-            input_token_length = pre_tokenized_ids.shape[1] + speech_embeds.shape[1] + post_tokenized_ids.shape[1]
-        else:
-            combined_embeds = torch.cat([pre_prompt_embeds, post_prompt_embeds, output_prompt_embeds], dim=1)
-            input_token_length = pre_tokenized_ids.shape[1] + post_tokenized_ids.shape[1]
+        cat_embs = [pre_prompt_embeds]
+        input_token_length = pre_tokenized_ids.shape[1]
 
+        if self.use_audio: 
+            cat_embs.append(speech_embeds)
+            input_token_length+=speech_embeds.shape[1]
+
+        cat_embs.append(post_prompt_embeds)
+        input_token_length+=post_prompt_embeds.shape[1]
+
+        if not test_mode: cat_embs.append(output_prompt_embeds)
+
+        combined_embeds = torch.cat(cat_embs, dim=1)
         atts = torch.ones(combined_embeds.size()[:-1], dtype=torch.long).to(combined_embeds.device)
 
         label_ids = torch.cat([
@@ -155,7 +161,7 @@ class SpeechLLMLightning(pl.LightningModule):
     
     def training_step(self, batch, batch_idx):
         mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids = batch
-        embeds, atts, label_ids = self.encode(mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids)
+        embeds, atts, label_ids = self.encode(mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids, test_mode=False)
         outputs = self.forward(embeds, atts, label_ids)
         loss =  outputs["loss"]
         self.log("train/loss", loss, on_epoch=True, on_step=False, sync_dist=True)
@@ -163,14 +169,14 @@ class SpeechLLMLightning(pl.LightningModule):
     
     def validation_step(self, batch, batch_idx):
         mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids = batch
-        embeds, atts, label_ids = self.encode(mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids)
+        embeds, atts, label_ids = self.encode(mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids, test_mode=False)
         outputs = self.forward(embeds, atts, label_ids)
         loss = outputs["loss"]
-        self.log("val/loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+        self.log("val/loss", loss, on_step=False, on_epoch=True, logger=True, sync_dist=True)
         
         # logits = outputs.logits
         # predicted_ids = torch.argmax(logits, dim=-1).cpu()
-
+        embeds, _, _ = self.encode(mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids, test_mode=True)
         predicted_ids = self.generate(embeds=embeds).cpu()
 
         generated_output_text = self.llm_tokenizer.decode(predicted_ids[0], skip_special_tokens=False)
@@ -194,10 +200,8 @@ class SpeechLLMLightning(pl.LightningModule):
     
     def test_step(self, batch, batch_idx):
         mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids = batch
-        embeds, atts, label_ids = self.encode(mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids)
+        embeds, atts, label_ids = self.encode(mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids, test_mode=True)
         predicted_ids = self.generate(embeds=embeds).cpu()
-        # loss = outputs["loss"]
-        # self.log("val/loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True)
         
         # logits = outputs.logits
         # predicted_ids = torch.argmax(logits, dim=-1)
@@ -272,10 +276,19 @@ class SpeechLLMLightning(pl.LightningModule):
             predicted_sum = extracted_pred['Summary']
             r_scores = self.rouge_scorer.score(target_sum,predicted_sum)
             # b_scores = self.bert_scorer.compute(predictions=predicted_sum, references=target_sum, lang="en")
-            self.log(f"{v}/summary/rouge_1", r_scores['rouge1'].precision, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
-            self.log(f"{v}/summary/rouge_2", r_scores['rouge2'].precision, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
-            self.log(f"{v}/summary/rouge_L", r_scores['rougeL'].precision, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
-            # self.log(f"{v}/summary/BertScore", b_scores.precision, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+            rouge_avg_f1 = (r_scores['rouge1'].fmeasure + r_scores['rouge2'].fmeasure + r_scores['rougeL'].fmeasure)/3
+            self.log(f"{v}/summary/rouge_avg_f1", rouge_avg_f1,          on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+            if v=='test':
+                self.log(f"{v}/summary/rouge_1_f1", r_scores['rouge1'].fmeasure, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+                self.log(f"{v}/summary/rouge_2_f1", r_scores['rouge2'].fmeasure, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+                self.log(f"{v}/summary/rouge_L_f1", r_scores['rougeL'].fmeasure, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+                self.log(f"{v}/summary/rouge_1_p", r_scores['rouge1'].precision, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+                self.log(f"{v}/summary/rouge_2_p", r_scores['rouge2'].precision, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+                self.log(f"{v}/summary/rouge_L_p", r_scores['rougeL'].precision, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+                self.log(f"{v}/summary/rouge_1_r", r_scores['rouge1'].recall, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+                self.log(f"{v}/summary/rouge_2_r", r_scores['rouge2'].recall, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+                self.log(f"{v}/summary/rouge_L_r", r_scores['rougeL'].recall, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+            # self.log(f"{v}/summary/BertScore", b_scores.fmeasure, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
 
     def on_validation_epoch_start(self, n=16):
         """Select n=16 random validation samples to log for each epoch."""

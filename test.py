@@ -1,11 +1,12 @@
 from pytorch_lightning import Trainer
 from pytorch_lightning.loggers import WandbLogger
+from pytorch_lightning.callbacks import TQDMProgressBar
 from trainer import SpeechLLMLightning
 from dataset import InstructionalAudioDataset
 
 import torch.utils.data as data_utils
 from dataset import InstructionalAudioDataset, MyCollator, CompositeAudioDataset
-from utils import get_model_config
+from utils import get_model_config, CustomProgressBar
 import os
 import shutil
 import logging
@@ -28,7 +29,7 @@ if __name__ == "__main__":
         model = SpeechLLMLightning(**model_config)
     tokenizer = model.llm_tokenizer
     trainer = Trainer(
-        accelerator='gpu', devices=1, log_every_n_steps=100
+        accelerator='gpu', devices=1, log_every_n_steps=100, callbacks=[TQDMProgressBar(refresh_rate=50)]
     )
     print("Model loaded")
 
@@ -36,11 +37,11 @@ if __name__ == "__main__":
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)
 
-    if model_config['use_text'] and model_config['use_audio']: text_options = [("AT", True, True), ("T", True, False), ("A", False, True)]
-    elif model_config['use_text']: text_options = [('T', True, False)]
-    else: text_options = [('A', False, True)]
+    if model_config['test_on']=='AT': text_options = [("AT", True, True), ("T", True, False), ("A", False, True)]
+    elif model_config['test_on']=='T': text_options = [('T', True, False)]
+    elif model_config['test_on']=='A': text_options = [('A', False, True)]
     # text_options = [('A', False, True)]
-    text_options = [("AT", True, True), ("T", True, False), ("A", False, True)]
+    # text_options = [("AT", True, True), ("T", True, False), ("A", False, True)]
 
     for test_set in model_config['test_sets']:
         for suffix, use_text, use_audio in text_options:

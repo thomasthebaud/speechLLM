@@ -2,6 +2,7 @@ __pycache__/*
 checkpoints/*
 logs/*.log
 logs/*/*.log
+logs/*/*/*.log
 data/*
 !data/test_xs.csv
 !data/dev_xs.csv
@@ -13,3 +14,6 @@ local/gpt_summaries
 exp/*
 pymp*
 tmp*
+*/*/.ipynb
+*/.ipynb
+local/*/*.ipynb
