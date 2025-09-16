@@ -7,7 +7,7 @@
 #SBATCH --partition=gpu-a100   #queue
 #SBATCH --account=a100acct
 #SBATCH --error=logs/test/A_wavlm-base-plus_cnn_TinyLlama_str2_mp10_Sum_T.A.G.Ac.E_bestR1_%j.log
-#SBATCH --output=logs/test/A_wavlm-base-plus_cnn_TinyLlama_str2_mp10_Sum_T.A.G.Ac.E__bestR1_%j.log
+#SBATCH --output=logs/test/A_wavlm-base-plus_cnn_TinyLlama_str2_mp10_Sum_T.A.G.Ac.E__bestR1_ %j.log
 
 export HF_HOME=./hf_cache/
 export HF_DATASETS_CACHE=./hf_cache/
