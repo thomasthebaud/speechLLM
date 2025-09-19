@@ -2,7 +2,7 @@ import torch
 from transformers import AutoProcessor, AutoFeatureExtractor
 
 import torch
-from torch.utils.data import Dataset, Sampler
+from torch.utils.data import Dataset, Sampler, WeightedRandomSampler
 import torchaudio
 from torchtune.datasets import ConcatDataset
 import pandas as pd
@@ -41,7 +41,7 @@ def make_weighted_sampler_from_dataset(dataset, dtype=torch.double):
     ])
     assert len(weights_per_sample) == len(dataset), "weights length must match the total number of samples."
 
-    return data_utils.WeightedRandomSampler(weights_per_sample,
+    return WeightedRandomSampler(weights_per_sample,
                                   num_samples=len(weights_per_sample),
                                   replacement=True)
                                   
@@ -57,21 +57,24 @@ class MyCollator:
             
 
     def __call__(self, batch):
-        mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids = [], [], [], []
+        mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids, data_names = [], [], [], [], []
         for el in batch:
-            m,pe,po,o = self.process(el)
+            m,pe,po,o,data_name = self.process(el)
             mel.append(m)
             pre_tokenized_ids.append(pe)
             post_tokenized_ids.append(po)
             output_tokenized_ids.append(o)
+            data_names.append(data_name)
+
         return (
             self.pad(mel), 
             self.pad(pre_tokenized_ids).long(), 
             self.pad(post_tokenized_ids).long(), 
-            self.pad(output_tokenized_ids).long())
+            self.pad(output_tokenized_ids).long(),
+            data_names)
 
     def process(self, element):
-        waveform, pre_speech_prompt, post_speech_prompt, output_prompt = element
+        waveform, pre_speech_prompt, post_speech_prompt, output_prompt, data_name = element
 
         if waveform is not None:
             # if "openai/whisper" in self.audio_encoder_name:
@@ -85,7 +88,7 @@ class MyCollator:
         post_tokenized_ids = self.tokenizer(post_speech_prompt, padding="do_not_pad", return_tensors='pt', truncation=False, add_special_tokens=False)["input_ids"]
         output_tokenized_ids = self.tokenizer(self.tokenizer.bos_token + output_prompt + self.tokenizer.eos_token, padding="do_not_pad", return_tensors='pt', truncation=False, add_special_tokens=False)["input_ids"]
         
-        return mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids
+        return mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids, data_name
 
     def pad(self, list_tensors):
         max_len = np.max([i.shape[1] for i in list_tensors])
@@ -169,7 +172,7 @@ class AudioDataset(Dataset):
         return waveform, labels_str, conv_history, transcript
     
 class InstructionalAudioDataset(AudioDataset):
-    def __init__(self, csv_file, mode='train',random_keys_prob=0.001,  max_len = -1, max_size=-1, fields=[], use_text=False, prob_text=0.5):
+    def __init__(self, csv_file, mode='train',random_keys_prob=0.001,  max_len = -1, max_size=-1, fields=[], use_text=False, prob_text=0.5, data_name='NaN'):
         """
         Initialize the class with the specified CSV file, mode, and random keys probability.
 
@@ -181,70 +184,11 @@ class InstructionalAudioDataset(AudioDataset):
         """
         self.use_text = use_text
         self.prob_text = prob_text
+        self.data_name = data_name
         super().__init__(csv_file, mode, random_keys_prob=random_keys_prob, max_len = max_len, max_size=max_size, fields=fields, use_text=use_text)
-        self.instruction_phrases = [
-            "Provide the details about the audio",
-            "I need the following information from the audio",
-            "Tell me about the audio regarding",
-            "Extract the following details from the audio",
-            "Give me the following information about the audio",
-            "Provide details from the audio file",
-            "I need information extracted from this speech",
-            "Detail the contents of the following audio",
-            "Share insights about this speech recording",
-            "Describe the specifics captured in this audio file",
-            "Summarize the audio's key information",
-            "Convey the details embedded in this speech",
-            "Outline the main points from this audio file",
-            "Unpack the content of the following speech",
-            "Present the facts from this audio recording",
-            "Elucidate the elements within this speech",
-            "Decipher the audio file's information",
-            "Break down the details in this speech",
-            "Analyze the following audio for details",
-            "Report on the specifics of this speech file",
-            "Transcribe the key points from this audio",
-            "Explain the content of the speech recording",
-            "Interpret the information within this audio file",
-            "Catalog the details from this speech",
-            "Narrate the findings in the audio",
-            "Recount the specifics of this speech file",
-            "Review the contents of the audio",
-            "Assess the information provided by this speech",
-            "Evaluate the details in the audio file",
-            "Investigate the speech for key information",
-            "Scrutinize the audio and provide insights",
-            "Inspect the details within this speech",
-            "Examine the audio file for specific information",
-            "Survey the speech and detail your findings",
-            "Study the audio and summarize the content",
-            "Audit the speech for important details",
-            "Appraise the audio file's key points",
-            "Annotate the specifics found in the speech",
-            "Dissect the audio to find important information",
-            "Extract insights from the speech file",
-            "Unveil the details in the audio recording",
-            "Shed light on the speech's content",
-            "Clarify the specifics within the audio file",
-            "Illuminate the information in the speech",
-            "Highlight the key points of the audio",
-            "Reveal the contents captured in the speech file",
-            "Uncover the details within the audio",
-            "Delve into the speech for essential information",
-            "Probe the audio file for details",
-            "Explore the speech recording's specifics",
-            "Research the contents of the audio",
-            "Inquire into the details of the speech",
-            "Sift through the audio for key information",
-            "Dive into the speech to extract details",
-            "Investigate the nuances of the audio file",
-            "Give me the following information about the audio",
-            "Fetch information",
-            "Give me details about the audio",
-            "what does this audio say",
-            'what is in the file',
-            'give me these details',
-        ]
+        with open("instructions.txt", 'r') as f:
+            self.instruction_phrases = f.readlines()
+            self.instruction_phrases = [i.strip('\n') for i in self.instruction_phrases if len(i)>5]
     
     def __getitem__(self, idx):
         waveform, labels_str, conv_history, transcript = super().__getitem__(idx)
@@ -265,7 +209,7 @@ class InstructionalAudioDataset(AudioDataset):
             output_prompt += f'  "{key}": "{value}", '
         output_prompt = output_prompt.rstrip(',\n') + "}"
 
-        return waveform, pre_speech_prompt, post_speech_prompt, output_prompt
+        return waveform, pre_speech_prompt, post_speech_prompt, output_prompt, self.data_name
 
 class CompositeAudioDataset(Dataset):
     def __init__(self, list_of_datasets, mode='train', random_keys_prob=0.001, max_len = -1, max_size=-1, use_text=False, prob_text=0.5):
@@ -279,7 +223,8 @@ class CompositeAudioDataset(Dataset):
                         max_size=max_size,
                         fields=list_of_datasets[data_name],
                         use_text=use_text,
-                        prob_text=prob_text
+                        prob_text=prob_text,
+                        data_name=data_name
                         )
             datasets.append(data)
             print(f"Loaded {data_name}, length = {len(data)}")

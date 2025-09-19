@@ -2,18 +2,18 @@
     "train":
     {
         "switchboard_train":["summary"],
-        "librispeech_train-clean-360":["transcript", "gender"]
+        "librispeech_train-clean-360":["transcript"]
     },
     "dev":
     {
         "switchboard_val":["summary"],
-        "librispeech_dev-clean":["transcript", "gender"],
-        "librispeech_dev-other":["transcript", "gender"]
+        "librispeech_dev-clean":["transcript"],
+        "librispeech_dev-other":["transcript"]
     },
     "test":
     {
         "switchboard_test":["summary"],
-        "librispeech_test-clean":["transcript", "gender"],
-        "librispeech_test-other":["transcript", "gender"]
+        "librispeech_test-clean":["transcript"],
+        "librispeech_test-other":["transcript"]
     }        
 }

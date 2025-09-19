@@ -3,6 +3,7 @@ from torch import nn
 
 
 def get_connector(name, audio_enc_dim, llm_dim, k, dim, layers=1):
+    if len(k)==1: k=k[0]
     if name == 'linear-pool':
         return LinearPoolConnector(audio_enc_dim, llm_dim)
     elif name == 'linear':
@@ -58,24 +59,34 @@ class LinearPoolConnector(nn.Module):
 class CNNConnector(nn.Module):
     def __init__(self, in_channels, out_channels, k):
         super().__init__()
-        self.layer = nn.Sequential(
+        if type(k)==type(list()):
+            assert len(k)==3
+            self.layer = nn.Sequential(
             nn.ReLU(),
             nn.Conv1d(in_channels, out_channels//2, kernel_size=5,
-                      stride=k//2, padding=2),
+                      stride=k[0], padding=2),
             nn.ReLU(),
             nn.Conv1d(out_channels//2, out_channels, kernel_size=5,
-                      stride=k, padding=2),
+                      stride=k[1], padding=2),
             nn.ReLU(),
             nn.Conv1d(out_channels, out_channels, kernel_size=5,
-                      stride=k//2, padding=2),
+                      stride=k[2], padding=2),
         )
+        elif type(k)==type(int()):
+            self.layer = nn.Sequential(
+                nn.ReLU(),
+                nn.Conv1d(in_channels, out_channels//2, kernel_size=5,
+                        stride=1, padding=2),
+                nn.ReLU(),
+                nn.Conv1d(out_channels//2, out_channels, kernel_size=5,
+                        stride=k, padding=2),
+                nn.ReLU(),
+                nn.Conv1d(out_channels, out_channels, kernel_size=5,
+                        stride=1, padding=2),
+            )
+        else:
+            print(f"Error: parameter k is not list nor int: k={k}, type={type(k)}")
+            exit()
     def forward(self, x):
         return self.layer(x.transpose(1,2)).transpose(1,2)
 
-
-
-if __name__ == "__main__":
-    model = CNNConnector(128, 256)
-    x = torch.randn(4, 50, 128)
-    z = model(x)
-    print(z.shape)

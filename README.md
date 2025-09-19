@@ -67,12 +67,10 @@ Trains up to ```--total-training-epoch``` maximum training epochs. top 3 models 
 ```
 conda env create -f environment.yml
 ``` 
-to install.
 - **Pip**: pip environment is available in ```requirements.txt```, use 
 ```
 pip install -r requirements.txt
 ```
-to install.
 
 ## Launching a training
 To train a network, use 

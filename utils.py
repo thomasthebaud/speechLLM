@@ -1,5 +1,6 @@
 import argparse
 import json
+import numpy as np
 
 def get_config(args):
     if args.use_config is None: #use default config
@@ -27,7 +28,7 @@ def get_model_config():
     parser.add_argument('--encoder')  
     parser.add_argument('--connector')  
     parser.add_argument('--llm')  
-    parser.add_argument('--connector-k', default=2, type=int)
+    parser.add_argument('--connector-k', default=2, type=str)
     parser.add_argument('--connector-dim', default=512, type=int)
     parser.add_argument('--encoder-dim', default=768, type=int)
     parser.add_argument('--connector-layers', default=1, type=int)
@@ -71,8 +72,12 @@ def get_model_config():
     if args.encoder_lr==-1: args.encoder_lr = float(args.lr)/50
     if args.meanpool!=1: model_name = model_name+f'_mp{args.meanpool}'
     if lr == 1.0: lr = 1e-4 if 'linear' not in args.connector else 1e-5
+
+    if ',' in args.connector_k: connector_k = [int(k) for k in args.connector_k.split(',')]
+    else: connector_k = [int(args.connector_k)]
+
     if args.connector=='cnn':
-        stride = int(args.connector_k)*(int(args.connector_k)//2)*(int(args.connector_k)//2)
+        stride = np.prod(connector_k)
         model_name = model_name+f'_str{stride}'
     model_name =  f"{model_name}_lr{lr}"
 
@@ -102,7 +107,7 @@ def get_model_config():
                 'connector_name': args.connector,
                 'llm_name': llm_name,
                 'finetune_encoder': args.ft_encoder,
-                'connector_k': int(args.connector_k),
+                'connector_k': connector_k,
                 'connector_dim': int(args.connector_dim),
                 'connector_layers': int(args.connector_layers),
                 'meanpool':int(args.meanpool),

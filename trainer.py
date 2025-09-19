@@ -160,7 +160,7 @@ class SpeechLLMLightning(pl.LightningModule):
         return out
     
     def training_step(self, batch, batch_idx):
-        mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids = batch
+        mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids, data_names = batch
         embeds, atts, label_ids = self.encode(mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids, test_mode=False)
         outputs = self.forward(embeds, atts, label_ids)
         loss =  outputs["loss"]
@@ -168,7 +168,7 @@ class SpeechLLMLightning(pl.LightningModule):
         return loss
     
     def validation_step(self, batch, batch_idx):
-        mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids = batch
+        mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids, data_names = batch
         embeds, atts, label_ids = self.encode(mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids, test_mode=False)
         outputs = self.forward(embeds, atts, label_ids)
         loss = outputs["loss"]
@@ -185,7 +185,7 @@ class SpeechLLMLightning(pl.LightningModule):
         extracted_pred = self.extract_prediction_values(generated_output_text)
         extracted_target = self.extract_prediction_values(target_text)
 
-        self.get_keys_and_log(extracted_pred, extracted_target, v='val')
+        self.get_keys_and_log(extracted_pred, extracted_target, data_names, v='val')
 
         if batch_idx in self.selected_samples_for_logging:
             sample_idx = self.selected_samples_for_logging.index(batch_idx)
@@ -199,7 +199,7 @@ class SpeechLLMLightning(pl.LightningModule):
         return {"val_loss": loss}
     
     def test_step(self, batch, batch_idx):
-        mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids = batch
+        mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids, data_names = batch
         embeds, atts, label_ids = self.encode(mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids, test_mode=True)
         predicted_ids = self.generate(embeds=embeds).cpu()
         
@@ -213,15 +213,18 @@ class SpeechLLMLightning(pl.LightningModule):
         extracted_pred = self.extract_prediction_values(generated_output_text)
         extracted_target = self.extract_prediction_values(target_text)
 
-        self.get_keys_and_log(extracted_pred, extracted_target, v='test')
+        self.get_keys_and_log(extracted_pred, extracted_target,data_names, v='test')
+        # Print everything during testing for further analysis
         logging.info(f"[PREDICTION]\t{extracted_pred}")
         logging.info(f"[RAW OUTPUT]\t{generated_output_text}")
         logging.info(f"[TARGET]\t{extracted_target}")
 
         return {"test_loss": 0}
     
-    def get_keys_and_log(self, extracted_pred, extracted_target, v='val'):
+    def get_keys_and_log(self, extracted_pred, extracted_target,data_names, v='val'):
+        if len(data_names)==1: v_, v = v, f"{v}/{data_names[0]}"
 
+        else: print(f"longer batchsize detected? data_names={data_names}. keeping v={v}")
         keys = extracted_target.keys()
         pred_keys = extracted_pred.keys()
 
@@ -277,7 +280,7 @@ class SpeechLLMLightning(pl.LightningModule):
             r_scores = self.rouge_scorer.score(target_sum,predicted_sum)
             # b_scores = self.bert_scorer.compute(predictions=predicted_sum, references=target_sum, lang="en")
             rouge_avg_f1 = (r_scores['rouge1'].fmeasure + r_scores['rouge2'].fmeasure + r_scores['rougeL'].fmeasure)/3
-            self.log(f"{v}/summary/rouge_avg_f1", rouge_avg_f1,          on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+            self.log(f"{v_}/summary/rouge_avg_f1", rouge_avg_f1,          on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
             if v=='test':
                 self.log(f"{v}/summary/rouge_1_f1", r_scores['rouge1'].fmeasure, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
                 self.log(f"{v}/summary/rouge_2_f1", r_scores['rouge2'].fmeasure, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)

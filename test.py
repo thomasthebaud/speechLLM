@@ -6,7 +6,7 @@ from dataset import InstructionalAudioDataset
 
 import torch.utils.data as data_utils
 from dataset import InstructionalAudioDataset, MyCollator, CompositeAudioDataset
-from utils import get_model_config, CustomProgressBar
+from utils import get_model_config
 import os
 import shutil
 import logging
@@ -68,7 +68,11 @@ if __name__ == "__main__":
                 prob_text=1
             )
             my_collator = MyCollator(model_config['audio_encoder_name'], tokenizer)
-            test_loader = data_utils.DataLoader(test_dataset, batch_size=model_config['batch_size'], shuffle=False, collate_fn=my_collator, num_workers=3)
+            test_loader = data_utils.DataLoader(test_dataset, 
+                    batch_size=model_config['batch_size'], 
+                    shuffle=False, 
+                    collate_fn=my_collator, 
+                    num_workers=3)
             trainer.use_audio=use_audio
             trainer.test(model=model, dataloaders=test_loader)
 
