@@ -27,4 +27,5 @@ python3 test.py \
     --no-audio \
     --group 'TALSP' \
     --use-config summarize_switchboard.json \
-    --epoch-to-test 17
+    --epoch-to-test 17 \
+    --test-on 'T'

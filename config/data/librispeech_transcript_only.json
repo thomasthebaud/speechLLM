@@ -2,11 +2,12 @@
 {
     "train":
     {
-        "librispeech_train-clean-100":["transcript"]
+        "librispeech_train-960":["transcript"]
     },
     "dev":
     {
         "librispeech_dev-clean":["transcript"],
+        "librispeech_dev-other":["transcript"]
     },
     "test":
     {

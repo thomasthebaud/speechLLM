@@ -65,7 +65,8 @@ if __name__ == "__main__":
                 max_len=model_config['max_number_seconds'],
                 fields=model_config['test_sets'][test_set],
                 use_text=use_text,
-                prob_text=1
+                prob_text=1,
+                data_name=test_set
             )
             my_collator = MyCollator(model_config['audio_encoder_name'], tokenizer)
             test_loader = data_utils.DataLoader(test_dataset, 

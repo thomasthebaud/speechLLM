@@ -13,7 +13,7 @@ import re
 import json
 
 from model.encoder import get_audio_encoder, TransformerAudioEncoder
-from model.connector import get_connector, LinearConnector, LinearPoolConnector, CNNConnector
+from model.connector import get_connector, CNNConnector
 from model.llm import get_llm
 from metrics import MAE
 from rouge_score import rouge_scorer
@@ -30,16 +30,22 @@ class MeanPooler(nn.Module):
 
 class SpeechLLMLightning(pl.LightningModule):
     def __init__(self, 
-                 audio_enc_dim=512, 
-                 llm_dim=2048, 
                  audio_encoder_name="speech-tokenizer",
-                 connector_name='linear-pool',
+                 connector_args={
+                    "name": "cnn",
+                    "k": [1,2,1],
+                    "n_layers":3,
+                    "input_dim": 768,
+                    "inside_dim": 512,
+                    "output_dim": 2048,
+                    "stride":2,
+                    "kernel_size":5,
+                    "in_meanpool":[]
+                    },
                  llm_name="TinyLlama/TinyLlama-1.1B-Chat-v1.0", 
                  finetune_encoder=False,
+                 ft_layers=(0,100),
                  use_audio=True,
-                 connector_k=5,
-                 connector_dim=512,
-                 connector_layers=1,
                  meanpool=1,
                  use_lora=True,
                  lora_r=32,
@@ -53,14 +59,14 @@ class SpeechLLMLightning(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters()
 
-        self.audio_enc_dim = audio_enc_dim
-        self.llm_dim = llm_dim
+        self.audio_enc_dim = connector_args["input_dim"]
+        self.llm_dim = connector_args['output_dim']
         self.llm_name = llm_name
         self.finetune_encoder = finetune_encoder and use_audio
         self.use_lora = use_lora
-
-        self.audio_encoder = get_audio_encoder(audio_encoder_name, finetune_encoder)
-        self.connector = get_connector(connector_name, audio_enc_dim, llm_dim, connector_k, connector_dim, connector_layers)
+        if "in_meanpool" in connector_args: self.audio_encoder = get_audio_encoder(audio_encoder_name, finetune_encoder, ft_layers, in_meanpool=connector_args["in_meanpool"])
+        else:  self.audio_encoder = get_audio_encoder(audio_encoder_name, finetune_encoder, ft_layers)
+        self.connector = get_connector(connector_args)
         self.pooling = MeanPooler(k=meanpool)
         self.llm_tokenizer, self.llm_model = get_llm(llm_name, use_lora, lora_r, lora_alpha)
         
@@ -281,7 +287,7 @@ class SpeechLLMLightning(pl.LightningModule):
             # b_scores = self.bert_scorer.compute(predictions=predicted_sum, references=target_sum, lang="en")
             rouge_avg_f1 = (r_scores['rouge1'].fmeasure + r_scores['rouge2'].fmeasure + r_scores['rougeL'].fmeasure)/3
             self.log(f"{v_}/summary/rouge_avg_f1", rouge_avg_f1,          on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
-            if v=='test':
+            if v_=='test':
                 self.log(f"{v}/summary/rouge_1_f1", r_scores['rouge1'].fmeasure, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
                 self.log(f"{v}/summary/rouge_2_f1", r_scores['rouge2'].fmeasure, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
                 self.log(f"{v}/summary/rouge_L_f1", r_scores['rougeL'].fmeasure, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)

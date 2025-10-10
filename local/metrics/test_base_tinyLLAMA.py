@@ -100,8 +100,10 @@ for sys_sum, ref_sum in zip(df["summary_out"], df["summary"]):
     rougeL_scores.append(scores["rougeL"].fmeasure)
 
 df["rouge1_f"] = rouge1_scores
+df["rouge2_f"] = rouge2_scores
 df["rougeL_f"] = rougeL_scores
 
 print("Average ROUGE-1 F:", sum(s for s in rouge1_scores if s is not None) / len([s for s in rouge1_scores if s is not None]))
+print("Average ROUGE-2 F:", sum(s for s in rouge2_scores if s is not None) / len([s for s in rouge2_scores if s is not None]))
 print("Average ROUGE-L F:", sum(s for s in rougeL_scores if s is not None) / len([s for s in rougeL_scores if s is not None]))
 

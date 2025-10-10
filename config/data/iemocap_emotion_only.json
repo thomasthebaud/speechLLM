@@ -2,11 +2,11 @@
 {
     "train":
     {
-        "iemocap_ses01-03":["emotion"],
+        "iemocap_ses01-03":["emotion"]
     },
     "dev":
     {
-        "iemocap_ses04":["emotion"],
+        "iemocap_ses04":["emotion"]
     },
     "test":
     {

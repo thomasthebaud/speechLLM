@@ -137,7 +137,7 @@ class AudioDataset(Dataset):
         if waveform.shape[1]>self.max_len and self.max_len>0: 
             start = int(np.random.rand(1)*(waveform.shape[1]-self.max_len))
             waveform=waveform[:, start:start+self.max_len]
-            print(f"DEBUG: shape after truncate: {waveform.shape}")
+            # print(f"DEBUG: shape after truncate: {waveform.shape}")
         # # Prepare labels dictionary based on mode and probability
         labels_str = {}
         if self.mode == 'train' and random.random() < self.random_keys_prob:

@@ -1,13 +1,13 @@
 #!/bin/bash
 #SBATCH --ntasks-per-node=1
 #SBATCH --mem=24000
-#SBATCH --job-name=tr_S #job name
+#SBATCH --job-name=te_ATp1 #job name
 #SBATCH --nodes=1  #number of nodes requested
 #SBATCH --gpus=1  #number of gpus requested
 #SBATCH --partition=gpu-a100   #queue
 #SBATCH --account=a100acct
-#SBATCH --error=logs/TASLP/test/A_wavlm-base-plus_cnn_TinyLlama_str2_mp10_Sum_%j.log
-#SBATCH --output=logs/TASLP/test/A_wavlm-base-plus_cnn_TinyLlama_str2_mp10_Sum_%j.log
+#SBATCH --error=logs/TASLP/test/AT_wavlm-base-plus_cnn_TinyLlama_str2_mp10_p1_%j.log
+#SBATCH --output=logs/TASLP/test/AT_wavlm-base-plus_cnn_TinyLlama_str2_mp10_p1_%j.log
 
 export HF_HOME=./hf_cache/
 export HF_DATASETS_CACHE=./hf_cache/
@@ -22,8 +22,12 @@ python3 test.py \
     --llm 'TinyLlama-1.1B-Chat-v1.0' \
     --batch-size 1 \
     --lr 0.0001 \
+    --use-text \
+    --prob-text 1 \
     --meanpool 10 \
     --group 'TALSP' \
     --use-config summarize_switchboard.json \
-    --epoch-to-test 13
+    --epoch-to-test 17 \
+    --nickname "_p1" \
+    --test-on "AT"
 

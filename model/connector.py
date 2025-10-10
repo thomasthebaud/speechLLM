@@ -2,21 +2,18 @@ import torch
 from torch import nn
 
 
-def get_connector(name, audio_enc_dim, llm_dim, k, dim, layers=1):
-    if len(k)==1: k=k[0]
-    if name == 'linear-pool':
-        return LinearPoolConnector(audio_enc_dim, llm_dim)
-    elif name == 'linear':
-        return LinearConnector(audio_enc_dim, llm_dim, k)
-    elif name == 'mlp':
-        return MLPConnector(audio_enc_dim, llm_dim, k, dim, layers)
-    elif name == 'cnn':
-        return CNNConnector(audio_enc_dim, llm_dim, k)
+def get_connector(args):
+    if args['name'] == 'linear':
+        return LinearConnector(args['input_dim'], args['output_dim'])
+    elif args['name'] == 'mlp':
+        return MLPConnector(args['input_dim'], args['output_dim'], args['inside_dim'], args['n_layers'])
+    elif args['name'] == 'cnn':
+        return CNNConnector(args['input_dim'], args['output_dim'], args['k'], args['n_layers'], args['kernel_size'])
     else:
         raise NotImplementedError
 
 class LinearConnector(nn.Module):
-    def __init__(self, in_dim, out_dim, k):
+    def __init__(self, in_dim, out_dim):
         super().__init__()
         self.layer = nn.Linear(in_dim, out_dim)
 
@@ -25,7 +22,7 @@ class LinearConnector(nn.Module):
         return x
 
 class MLPConnector(nn.Module):
-    def __init__(self, in_dim, out_dim, k, dim, n_layers=1):
+    def __init__(self, in_dim, out_dim, dim, n_layers=1):
         super().__init__()
         if n_layers==1: self.layer = nn.Linear(in_dim, out_dim)
         elif n_layers==2: 
@@ -39,54 +36,21 @@ class MLPConnector(nn.Module):
         x = self.layer(x)
         return x
 
-class LinearPoolConnector(nn.Module):
-    def __init__(self, input_dim, output_dim):
-        super(LinearPoolConnector, self).__init__()
-        self.linear1 = nn.Sequential(
-            nn.Linear(input_dim, output_dim),
-            nn.ReLU())
-        self.linear2 = nn.Sequential(
-            nn.Linear(output_dim, output_dim),
-            nn.ReLU(),
-            nn.Linear(output_dim, output_dim))
-
-    def forward(self, x):
-        # x: [B, T, d]
-        x = self.linear1(x)  # x: [B, T, D]
-        x = self.linear2(x)
-        return x
-
 class CNNConnector(nn.Module):
-    def __init__(self, in_channels, out_channels, k):
+    def __init__(self, in_channels, out_channels, k, n_layers, kernel_size):
         super().__init__()
-        if type(k)==type(list()):
-            assert len(k)==3
-            self.layer = nn.Sequential(
-            nn.ReLU(),
-            nn.Conv1d(in_channels, out_channels//2, kernel_size=5,
-                      stride=k[0], padding=2),
-            nn.ReLU(),
-            nn.Conv1d(out_channels//2, out_channels, kernel_size=5,
-                      stride=k[1], padding=2),
-            nn.ReLU(),
-            nn.Conv1d(out_channels, out_channels, kernel_size=5,
-                      stride=k[2], padding=2),
+        assert len(k)==n_layers
+        self.layer = nn.Sequential(
+        nn.ReLU(),
+        nn.Conv1d(in_channels, out_channels//2, kernel_size=kernel_size,
+                    stride=k[0], padding=2),
+        nn.ReLU(),
+        nn.Conv1d(out_channels//2, out_channels, kernel_size=kernel_size,
+                    stride=k[1], padding=2),
+        nn.ReLU(),
+        nn.Conv1d(out_channels, out_channels, kernel_size=kernel_size,
+                    stride=k[2], padding=2),
         )
-        elif type(k)==type(int()):
-            self.layer = nn.Sequential(
-                nn.ReLU(),
-                nn.Conv1d(in_channels, out_channels//2, kernel_size=5,
-                        stride=1, padding=2),
-                nn.ReLU(),
-                nn.Conv1d(out_channels//2, out_channels, kernel_size=5,
-                        stride=k, padding=2),
-                nn.ReLU(),
-                nn.Conv1d(out_channels, out_channels, kernel_size=5,
-                        stride=1, padding=2),
-            )
-        else:
-            print(f"Error: parameter k is not list nor int: k={k}, type={type(k)}")
-            exit()
     def forward(self, x):
         return self.layer(x.transpose(1,2)).transpose(1,2)
 

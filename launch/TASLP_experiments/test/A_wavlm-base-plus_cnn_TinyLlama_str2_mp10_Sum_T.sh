@@ -18,11 +18,10 @@ export 'PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512'
 
 python3 test.py \
     --encoder 'microsoft/wavlm-base-plus' \
-    --connector 'cnn' \
+    --connector 'cnn_str1.2.1' \
     --llm 'TinyLlama-1.1B-Chat-v1.0' \
     --batch-size 1 \
     --lr 0.0001 \
-    --connector-k 2 \
     --meanpool 10 \
     --group 'TALSP' \
     --use-config summarize_switchboard_librispeech.json \

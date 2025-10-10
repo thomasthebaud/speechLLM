@@ -1,0 +1,13 @@
+
+{
+ 
+    "name": "cnn",
+    "k": [1,2,1],
+    "n_layers":3,
+    "input_dim": 768,
+    "inside_dim": 512,
+    "output_dim": 2048,
+    "stride":2,
+    "kernel_size":5,
+    "in_meanpool":[]
+}

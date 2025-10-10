@@ -25,7 +25,7 @@ python3 train.py \
     --connector-k 2 \
     --meanpool 10 \
     --group 'TALSP' \
-    --use-config summarize_switchboard_librispeech.json \
+    --use-config summarize_switchboard_librispeech960.json \
     --total-training-epoch 100 \
     --nickname "_T"
 
