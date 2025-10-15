@@ -236,10 +236,21 @@ class CompositeAudioDataset(Dataset):
             self.len = len(self.dataset)
             self.datasets_weights = np.array([1.0])  # single dataset, weight is 1
         else:
+            # summarize=False
+            # for data_name in list_of_datasets:
+            #     if "summary" in list_of_datasets[data_name]: summarize=True
             # more than one dataset, use ConcatDataset
             self.dataset = ConcatDataset(datasets)
             self.len = len(self.dataset)
+            # if summarize and mode=='train':
+            #     self.datasets_weights = np.array([0.5 if "summary" in list_of_datasets[data_name] else 0.5/(len(datasets)-1) for data_name in list_of_datasets])
+            #     print(f"Warning: Using unbalanced sampler for {mode} for summarization:\tSets = {list_of_datasets.keys()} \tWeights = {self.datasets_weights}")
+            # else:
+            #     self.datasets_weights = np.array([1/(len(datasets)) for data_name in list_of_datasets])
+            #     print(f"Warning: Using balanced sampler for {mode}:\tSets = {list_of_datasets.keys()} \tWeights = {self.datasets_weights}")
+
             self.datasets_weights = np.array([self.len/len(d) for d in datasets])
+            print(f"Weights for {mode}:\tSets = {list_of_datasets.keys()} \tWeights = {self.datasets_weights}")
 
 
     def __len__(self):

@@ -91,7 +91,7 @@ def get_model_config():
     else: ft_layers = (0,100)
     if args.meanpool!=1:            model_name = model_name+f'_mp{args.meanpool}'
     if len(connector['in_meanpool'])>0: model_name = model_name+"_inmp"+'.'.join([str(i[1]) for i in connector['in_meanpool']])
-    # model_name =  f"{model_name}_lr{lr}"
+    if args.encoder_lr==-1: model_name =  f"{model_name}_lrenc{args.encoder_lr}"
     if connector['name']=='cnn':    model_name = model_name+"_str2"#+'.'.join([str(i) for i in connector['k']])
     model_name =  f"{model_name}_lr{lr}"
 
