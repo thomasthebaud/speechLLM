@@ -1,0 +1,20 @@
+{
+    "train":
+    {
+        "switchboard_GPT3.5_train":["summary"],
+        "switchboard_GPT4.o_train":["summary"],
+        "switchboard_GPT5-mini_train":["summary"]
+    },
+    "dev":
+    {
+        "switchboard_GPT3.5_val":["summary"],
+        "switchboard_GPT4.o_val":["summary"],
+        "switchboard_GPT5-mini_val":["summary"]
+    },
+    "test":
+    {
+        "switchboard_GPT3.5_test":["summary"],
+        "switchboard_GPT4.o_test":["summary"],
+        "switchboard_GPT5-mini_test":["summary"]
+    }        
+}

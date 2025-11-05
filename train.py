@@ -71,7 +71,7 @@ if __name__ == "__main__":
     if model_config['use_summaries']:
         print("Using max ROUGE avg F1 score as target")
         checkpoint_callback = ModelCheckpoint(
-                    dirpath=f"checkpoints/{model_config['model_name']}", 
+                    dirpath=f"checkpoints/{model_config['group']}/{model_config['model_name']}", 
                     filename=model_config['model_name']+'epoch-{epoch}', 
                     save_top_k=3, 
                     mode="max",
@@ -83,7 +83,7 @@ if __name__ == "__main__":
     else:
         print("Using min val loss as target")
         checkpoint_callback = ModelCheckpoint(
-                        dirpath=f"checkpoints/{model_config['model_name']}", 
+                        dirpath=f"checkpoints/{model_config['group']}/{model_config['model_name']}", 
                         filename=model_config['model_name']+'epoch-{epoch}', 
                         save_top_k=3, 
                         monitor="val/loss", 

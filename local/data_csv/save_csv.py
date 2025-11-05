@@ -1,6 +1,7 @@
 import pandas as pd
 
 def save_csv(df, dataset, set, target="/home/tthebau1/EDART/SpeechLLM/data/"):
+    pd.options.mode.chained_assignment = None
     columns = ['transcript','gender','emotion','age','accent', 'noises', 'summary']
     df['dataset'] = dataset
     df['set'] = set

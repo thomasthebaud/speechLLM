@@ -6,8 +6,8 @@
 #SBATCH --gpus=1  #number of gpus requested
 #SBATCH --partition=gpu-a100   #queue
 #SBATCH --account=a100acct
-#SBATCH --error=logs/TASLP/train/A_wavlm-base-plus_cnn_TinyLlama_str2_mp10_Sum_%j.log
-#SBATCH --output=logs/TASLP/train/A_wavlm-base-plus_cnn_TinyLlama_str2_mp10_Sum_%j.log
+#SBATCH --error=logs/TASLP/train/A_wavlm-base-plus_cnn_TinyLlama_str2_mp10_Sum_cleanwav_%j.log
+#SBATCH --output=logs/TASLP/train/A_wavlm-base-plus_cnn_TinyLlama_str2_mp10_Sum_cleanwav_%j.log
 
 export HF_HOME=./hf_cache/
 export HF_DATASETS_CACHE=./hf_cache/
@@ -25,5 +25,6 @@ python3 train.py \
     --meanpool 10 \
     --group 'TALSP' \
     --use-config summarize_switchboard.json \
-    --total-training-epoch 100
+    --total-training-epoch 100 \
+    --nickname '_cleanwav'
 

@@ -6,8 +6,8 @@
 #SBATCH --gpus=1  #number of gpus requested
 #SBATCH --partition=gpu-a100   #queue
 #SBATCH --account=a100acct
-#SBATCH --error=logs/TASLP/train/A_wavlm-base-plus_cnn_TinyLlama_str2_mp10_Sum_T.G.A.E.Ac_%j.log
-#SBATCH --output=logs/TASLP/train/A_wavlm-base-plus_cnn_TinyLlama_str2_mp10_Sum_T.G.A.E.Ac_%j.log
+#SBATCH --error=logs/TASLP/train/A_wavlm-base-plus_cnn_TinyLlama_str2_mp10_Sum_T.G.A.E.Ac_cleanwav_%j.log
+#SBATCH --output=logs/TASLP/train/A_wavlm-base-plus_cnn_TinyLlama_str2_mp10_Sum_T.G.A.E.Ac_cleanwav_%j.log
 
 export HF_HOME=./hf_cache/
 export HF_DATASETS_CACHE=./hf_cache/
@@ -26,5 +26,5 @@ python3 train.py \
     --group 'TALSP' \
     --use-config summarize+multitask_switchboard_librispeech_voxceleb_iemocap_commonvoice.json \
     --total-training-epoch 250 \
-    --nickname "_T.G.A.E.Ac"
+    --nickname "_T.G.A.E.Ac_cleanwav"
 

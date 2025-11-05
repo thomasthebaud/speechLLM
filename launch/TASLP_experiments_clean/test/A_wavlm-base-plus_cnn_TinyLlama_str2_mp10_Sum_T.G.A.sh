@@ -1,13 +1,13 @@
 #!/bin/bash
 #SBATCH --ntasks-per-node=1
 #SBATCH --mem=24000
-#SBATCH --job-name=te_S #job name
+#SBATCH --job-name=te_STGA #job name
 #SBATCH --nodes=1  #number of nodes requested
 #SBATCH --gpus=1  #number of gpus requested
 #SBATCH --partition=gpu-a100   #queue
 #SBATCH --account=a100acct
-#SBATCH --error=logs/TASLP/test/A_wavlm-base-plus_cnn_TinyLlama_str2_mp10_Sum_cleanwav_%j.log
-#SBATCH --output=logs/TASLP/test/A_wavlm-base-plus_cnn_TinyLlama_str2_mp10_Sum_cleanwav_%j.log
+#SBATCH --error=logs/TASLP_clean/test/A_wavlm-base-plus_cnn_TinyLlama_str2_mp10_Sum_T.G.A_%j.log
+#SBATCH --output=logs/TASLP_clean/test/A_wavlm-base-plus_cnn_TinyLlama_str2_mp10_Sum_T.G.A_%j.log
 
 export HF_HOME=./hf_cache/
 export HF_DATASETS_CACHE=./hf_cache/
@@ -24,7 +24,7 @@ python3 test.py \
     --lr 0.0001 \
     --meanpool 10 \
     --group 'TALSP' \
-    --use-config summarize_switchboard.json \
-    --epoch-to-test 17 \
-    --nickname '_cleanwav'
+    --use-config summarize+agegender_switchboard_librispeech_voxceleb.json \
+    --epoch-to-test 93 \
+    --nickname "_T.G.A"
 

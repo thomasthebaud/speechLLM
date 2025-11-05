@@ -18,11 +18,11 @@ if __name__ == "__main__":
     if model_config['epoch_to_test']>0:
         version = f"{model_config['model_name']}epoch-epoch={model_config['epoch_to_test']}"
         i=0
-        while os.path.exists(f"checkpoints/{model_config['model_name']}/{version}-v{i+1}.ckpt"):
+        while os.path.exists(f"checkpoints/{model_config['group']}/{model_config['model_name']}/{version}-v{i+1}.ckpt"):
             i+=1
         print(f"Using epoch {model_config['epoch_to_test']} version {i}")
-        if i==0: model = SpeechLLMLightning.load_from_checkpoint(f"checkpoints/{model_config['model_name']}/{version}.ckpt")
-        else:    model = SpeechLLMLightning.load_from_checkpoint(f"checkpoints/{model_config['model_name']}/{version}-v{i}.ckpt")
+        if i==0: model = SpeechLLMLightning.load_from_checkpoint(f"checkpoints/{model_config['group']}/{model_config['model_name']}/{version}.ckpt")
+        else:    model = SpeechLLMLightning.load_from_checkpoint(f"checkpoints/{model_config['group']}/{model_config['model_name']}/{version}-v{i}.ckpt")
     else:
         print("Using untrained model!")
         version='base'
