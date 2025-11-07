@@ -64,8 +64,12 @@ class SpeechLLMLightning(pl.LightningModule):
         self.llm_name = llm_name
         self.finetune_encoder = finetune_encoder and use_audio
         self.use_lora = use_lora
-        if "in_meanpool" in connector_args: self.audio_encoder = get_audio_encoder(audio_encoder_name, finetune_encoder, ft_layers, in_meanpool=connector_args["in_meanpool"])
-        else:  self.audio_encoder = get_audio_encoder(audio_encoder_name, finetune_encoder, ft_layers)
+        if "in_meanpool" in connector_args: 
+            self.modified_encoder = len(connector_args["in_meanpool"])>0
+            self.audio_encoder = get_audio_encoder(audio_encoder_name, finetune_encoder, ft_layers, in_meanpool=connector_args["in_meanpool"])
+        else:  
+            self.modified_encoder = False
+            self.audio_encoder = get_audio_encoder(audio_encoder_name, finetune_encoder, ft_layers)
         self.connector = get_connector(connector_args)
         self.pooling = MeanPooler(k=meanpool)
         self.llm_tokenizer, self.llm_model = get_llm(llm_name, use_lora, lora_r, lora_alpha)
@@ -90,36 +94,48 @@ class SpeechLLMLightning(pl.LightningModule):
         optimizer = Adam(opt, lr=self.max_lr)
         return optimizer
 
-    def encode_speech_segment(self, mel):
+    def encode_speech_segment(self, mel, n_chunks=0):
+        mel = self.check_minimum_size(mel)
+        # print(f"input mel shape = {mel.shape}")
         if self.finetune_encoder:
             speech_embeds = self.audio_encoder(mel)
         else:
             with torch.no_grad():
                 speech_embeds = self.audio_encoder(mel)
-        # print(f"encoded size: {speech_embeds.shape}")
+        # print(f"encoded size: {speech_embeds.shape}, {n_chunks} minutes")
         return speech_embeds
+
+    def check_minimum_size(self, mel):
+        #WavLM needs at least one second of audio, my modified version needs at least 4
+        if not self.modified_encoder: return mel
+        minimum_length = 4*16_000
+
+        while mel.shape[1]<minimum_length:
+            mel = torch.cat([mel,mel], dim=1)
+        return mel
 
     def encode(self, mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids, return_embedding_loss=False, chunk_size=60*16_000, test_mode=False):
         batch_size = mel.shape[0]
         
         #use chunks of size 1min max
-        # print(f"{mel.shape}")
+        # print(f"mel shape = {mel.shape}")
         if self.use_audio:
             if mel.shape[1]<chunk_size:
                 speech_embeds = self.encode_speech_segment(mel)
             else:
                 chunks = mel.split(chunk_size, dim=1)
                 outs = []
-                for c in chunks:
+                for m,c in enumerate(chunks):
                     if c.shape[1]>=16_000: #WavLM needs at least one second of audio
-                        outs.append(self.encode_speech_segment(c))
+                        outs.append(self.encode_speech_segment(c,m))
                 speech_embeds = torch.cat(outs, dim=1)
-                # print(f"{mel.shape}, {speech_embeds.shape}")
+                # print(f"{mel.shape}, {speech_embeds.shape}, successfully processed {m} minutes")
                 del mel
                 del chunks
                 del outs
 
             speech_embeds = self.connector(self.pooling(speech_embeds))
+            # print(f"output speech embeddings: {speech_embeds.shape}")
 
 
         if self.use_lora: embedder = self.llm_model.model.model.embed_tokens
@@ -286,6 +302,7 @@ class SpeechLLMLightning(pl.LightningModule):
             r_scores = self.rouge_scorer.score(target_sum,predicted_sum)
             # b_scores = self.bert_scorer.compute(predictions=predicted_sum, references=target_sum, lang="en")
             rouge_avg_f1 = (r_scores['rouge1'].fmeasure + r_scores['rouge2'].fmeasure + r_scores['rougeL'].fmeasure)/3
+            self.log(f"{v}/summary/rouge_avg_f1", rouge_avg_f1,          on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
             self.log(f"{v_}/summary/rouge_avg_f1", rouge_avg_f1,          on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
             if v_=='test':
                 self.log(f"{v}/summary/rouge_1_f1", r_scores['rouge1'].fmeasure, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)

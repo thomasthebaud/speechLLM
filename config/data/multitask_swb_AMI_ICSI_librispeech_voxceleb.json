@@ -1,0 +1,28 @@
+{
+    "train":
+    {
+        "switchboard_train":["summary"],
+        "AMI_train":["summary"],
+        "ICSI_train":["summary"],
+        "voxceleb2_enriched_dev":["age", "gender"],
+        "librispeech_train-clean-360":["transcript", "gender"]
+    },
+    "dev":
+    {
+        "switchboard_val":["summary"],
+        "AMI_val":["summary"],
+        "ICSI_val":["summary"],
+        "voxceleb2_enriched_test":["age", "gender"],
+        "librispeech_dev-clean":["transcript"],
+        "librispeech_dev-other":["transcript"]
+    },
+    "test":
+    {
+        "switchboard_test":["summary"],
+        "AMI_test":["summary"],
+        "ICSI_test":["summary"],
+        "voxceleb2_enriched_test":["age", "gender"],
+        "librispeech_test-clean":["transcript"],
+        "librispeech_test-other":["transcript"]
+    }        
+}

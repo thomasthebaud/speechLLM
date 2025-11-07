@@ -1,0 +1,20 @@
+{
+    "train":
+    {
+        "switchboard_train":["summary"],
+        "AMI_train":["summary"],
+        "ICSI_train":["summary"]
+    },
+    "dev":
+    {
+        "switchboard_val":["summary"],
+        "AMI_val":["summary"],
+        "ICSI_val":["summary"]
+    },
+    "test":
+    {
+        "switchboard_test":["summary"],
+        "AMI_test":["summary"],
+        "ICSI_test":["summary"]
+    }        
+}

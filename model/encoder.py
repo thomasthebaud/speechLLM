@@ -2,6 +2,7 @@ import torch
 from torch import nn
 from transformers import AutoModel, WavLMModel
 from torchaudio.transforms import MFCC
+from numpy import min as npmin
 #from speechtokenizer import SpeechTokenizer
 
 def get_audio_encoder(name, finetune_encoder,ft_layers, in_meanpool=[]):
@@ -50,15 +51,18 @@ class ModifiedWavLMAudioEncoder(nn.Module):
             else:                new_layers.append(WavLMEncoderLayer_proxy(layer, meanpool=1))
         self.encoder.encoder.layers = nn.ModuleList(new_layers)
 
+        num_layers = len(self.encoder.encoder.layers)
         if ft_layers[0]==0 and ft_layers[1]==100:
-            print("Will finetune all encoder parameters")
-            for param in self.encoder.parameters():
-                param.requires_grad = finetune
+            print("Will find optimal layers to finetune based on the meanpooling layers:")
+            ft_layers = (npmin([i for i in in_meanpool]), num_layers)
+            print(f"from layer {ft_layers[0]} to the end.")
         else:
-            num_layers = len(self.encoder.encoder.layers)
             print(f"Will finetune layers {ft_layers[0]} to {min(ft_layers[1], num_layers)}")
-            for param in self.encoder.encoder.layers[ft_layers[0]:min(ft_layers[1], num_layers)].parameters():
-                param.requires_grad = finetune
+
+        for param in self.encoder.parameters():
+            param.requires_grad = False
+        for param in self.encoder.encoder.layers[ft_layers[0]:min(ft_layers[1], num_layers)].parameters():
+            param.requires_grad = True
         # for param in self.encoder.encoder.layers[-15:].parameters():
         #     param.requires_grad = finetune
 

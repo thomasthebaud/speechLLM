@@ -8,7 +8,7 @@ from sklearn.model_selection import train_test_split
 
 from save_csv import save_csv
 
-model_list = ['GPT3.5', 'GPT4.o', 'GPT5-mini']
+model_list = ['GPT4.o-audio', 'GPT3.5', 'GPT4.o', 'GPT5-mini']
 root = '/export/fs05/tthebau1/EDART/SwitchBoard/'
 transcript_files = os.listdir(root+'transcripts_clean/')
 transcript_files = [i for i in transcript_files if len(i)>10]
@@ -20,32 +20,33 @@ audio_files = ['sw0'+i[8:-4]+'.wav' for i in transcript_files]
 not_found = []
 for file in tqdm(audio_files, desc='audio files processing'):
     audio_path=f"{root}wav/{file}"
-    labels['audio_path'].append(audio_path)
     try: 
         audio = mutagen.File(audio_path)
         labels['audio_len'].append(audio.info.length)
+        labels['audio_path'].append(audio_path)
     except:
-        not_found.append(audio_path)
-        labels['audio_len'].append(0)
+        not_found.append(file)
         print(f"file {audio_path} not found")
         
 print(f"Longest segment is: {np.max(labels['audio_len'])} seconds")
+
+transcript_files = [i for i in transcript_files if 'sw0'+i[8:-4]+'.wav' not in not_found] #removing the missing audios
 
 all_dfs = []
 for model in model_list:
     labels['summary'] = []
     summary_files = os.listdir(root+f'summaries_{model}/')
-    summary_files = [i for i in summary_files if len(i)>10]
+    summary_files = [i for i in summary_files if len(i)>10 and 'sw0'+i[8:-4]+'.wav' not in not_found] #removing the missing audios
     assert len(transcript_files)==len(summary_files)
     # get summaries
-    for file in summary_files:
+    for file in tqdm(summary_files, desc=f"processing summaries from {model}"):
         with open(root+f'summaries_{model}/'+file, 'r') as f:
             lines = f.readlines()
         summary = ' '.join([l.strip('\n') for l in lines])
         labels['summary'].append(summary)
 
     df = pd.DataFrame(labels)
-    print(model, df.tail())
+    print(model, df.tail(n=2))
     df['model']=model
     df = df[~df['audio_path'].isin(not_found)]
     print(f"Processed {len(df)} conversations, by model {model}")
