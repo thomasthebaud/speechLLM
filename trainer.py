@@ -64,9 +64,14 @@ class SpeechLLMLightning(pl.LightningModule):
         self.llm_name = llm_name
         self.finetune_encoder = finetune_encoder and use_audio
         self.use_lora = use_lora
-        if "in_meanpool" in connector_args: 
+        self.hybrid = False
+        self.max_processed_length = 10
+        if "in_meanpool" in connector_args:
+            if "hybrid" in  connector_args:
+                print(f"Using hybrid parameter: {connector_args['hybrid']}")
+                self.hybrid = connector_args['hybrid']
             self.modified_encoder = len(connector_args["in_meanpool"])>0
-            self.audio_encoder = get_audio_encoder(audio_encoder_name, finetune_encoder, ft_layers, in_meanpool=connector_args["in_meanpool"])
+            self.audio_encoder = get_audio_encoder(audio_encoder_name, finetune_encoder, ft_layers, in_meanpool=connector_args["in_meanpool"], hybrid=self.hybrid)
         else:  
             self.modified_encoder = False
             self.audio_encoder = get_audio_encoder(audio_encoder_name, finetune_encoder, ft_layers)
@@ -94,42 +99,59 @@ class SpeechLLMLightning(pl.LightningModule):
         optimizer = Adam(opt, lr=self.max_lr)
         return optimizer
 
-    def encode_speech_segment(self, mel, n_chunks=0):
-        mel = self.check_minimum_size(mel)
-        # print(f"input mel shape = {mel.shape}")
+    def encode_speech_segment(self, mel, n_chunks=0,verbose=False, out_middle=False):
+        keep_it, mel = self.check_minimum_size(mel, n_chunks=n_chunks, verbose=verbose, out_middle=out_middle)
+        if not keep_it: return False, 0
+
+        if verbose: print(f"input mel shape = {mel.shape}")
         if self.finetune_encoder:
-            speech_embeds = self.audio_encoder(mel)
+            if self.modified_encoder: speech_embeds = self.audio_encoder(mel, out_middle=out_middle)
+            else: speech_embeds = self.audio_encoder(mel)
         else:
             with torch.no_grad():
                 speech_embeds = self.audio_encoder(mel)
-        # print(f"encoded size: {speech_embeds.shape}, {n_chunks} minutes")
-        return speech_embeds
+        if verbose: print(f"encoded size: {speech_embeds.shape}, {n_chunks} minutes")
+        return True, speech_embeds
 
-    def check_minimum_size(self, mel):
-        #WavLM needs at least one second of audio, my modified version needs at least 4
-        if not self.modified_encoder: return mel
-        minimum_length = 4*16_000
+    def check_minimum_size(self, mel, n_chunks=0, verbose=False, out_middle=False):
+        if not self.modified_encoder: #classic WavLM, 1sec minimum
+            minimum_length = 16_000
+            if n_chunks==0 or mel.shape[1]>=minimum_length: return True, mel #if it's the only chunk, it should be over 1sec, don't touch it
+            else: return False, mel #not the first, less than 1sec
+        else: #modified wavlm, 4sec mininimum
+            minimum_length = 5*16_000
+            if mel.shape[1]>=minimum_length or out_middle: return True, mel
+            elif mel.shape[1]<minimum_length and n_chunks>0: return False, mel
+            else:        
+                if verbose: print(f"original mel shape = {mel.shape}")
+                while mel.shape[1]<minimum_length:
+                    mel = torch.cat([mel,mel], dim=1)
+                return True, mel
 
-        while mel.shape[1]<minimum_length:
-            mel = torch.cat([mel,mel], dim=1)
-        return mel
-
-    def encode(self, mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids, return_embedding_loss=False, chunk_size=60*16_000, test_mode=False):
+    def encode(self, 
+        mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids, 
+        return_embedding_loss=False, chunk_size=60*16_000, test_mode=False, 
+        verbose=False):
         batch_size = mel.shape[0]
         
         #use chunks of size 1min max
-        # print(f"mel shape = {mel.shape}")
+        if verbose: print(f"mel shape = {mel.shape}")
         if self.use_audio:
             if mel.shape[1]<chunk_size:
-                speech_embeds = self.encode_speech_segment(mel)
+                _, speech_embeds = self.encode_speech_segment(mel,n_chunks=0, verbose=verbose, out_middle=self.hybrid)
             else:
                 chunks = mel.split(chunk_size, dim=1)
                 outs = []
                 for m,c in enumerate(chunks):
-                    if c.shape[1]>=16_000: #WavLM needs at least one second of audio
-                        outs.append(self.encode_speech_segment(c,m))
+                    keep_it, out = self.encode_speech_segment(c,m,verbose=verbose, out_middle=False)
+                    if keep_it: outs.append(out)
+                    else:continue
+                        
                 speech_embeds = torch.cat(outs, dim=1)
-                # print(f"{mel.shape}, {speech_embeds.shape}, successfully processed {m} minutes")
+                if verbose: print(f"{mel.shape}, {speech_embeds.shape}, successfully processed {m} minutes")
+                if m>self.max_processed_length: 
+                    self.max_processed_length = m
+                    print(f"Maximum length processed: {self.max_processed_length} minutes.")
                 del mel
                 del chunks
                 del outs

@@ -25,5 +25,5 @@ python3 test.py \
     --meanpool 50 \
     --group 'TASLP_v2' \
     --use-config summarize_switchboard.json \
-    --total-testing-epoch 50
+    --epoch-to-test 17
 

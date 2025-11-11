@@ -1,0 +1,13 @@
+
+{
+ 
+    "name": "linear",
+    "k": 1,
+    "n_layers":3,
+    "input_dim": 768,
+    "inside_dim": -1,
+    "output_dim": 2048,
+    "stride":-1,
+    "kernel_size":-1,
+    "in_meanpool":[]
+}

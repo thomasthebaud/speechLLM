@@ -5,10 +5,10 @@ from torchaudio.transforms import MFCC
 from numpy import min as npmin
 #from speechtokenizer import SpeechTokenizer
 
-def get_audio_encoder(name, finetune_encoder,ft_layers, in_meanpool=[]):
+def get_audio_encoder(name, finetune_encoder,ft_layers, in_meanpool=[], hybrid=False):
     if name in ["facebook/hubert-xlarge-ll60k", "microsoft/wavlm-large", 'microsoft/wavlm-base-plus']:
         # return TransformerAudioEncoder(model_name=name, finetune=finetune_encoder)
-        if len(in_meanpool)>0 and name=='microsoft/wavlm-base-plus': return ModifiedWavLMAudioEncoder(ft_layers, finetune=finetune_encoder, in_meanpool=in_meanpool)
+        if len(in_meanpool)>0 and name=='microsoft/wavlm-base-plus': return ModifiedWavLMAudioEncoder(ft_layers, finetune=finetune_encoder, in_meanpool=in_meanpool, hybrid=hybrid)
         else: return TransformerAudioEncoder(ft_layers, model_name=name, finetune=finetune_encoder)
     elif name=='MFCC':
         return MFCC(
@@ -37,8 +37,10 @@ class TransformerAudioEncoder(nn.Module):
         return self.encoder(x).last_hidden_state
 
 class ModifiedWavLMAudioEncoder(nn.Module):
-    def __init__(self,ft_layers,  finetune=False, in_meanpool=[[2,1]]):
+    def __init__(self,ft_layers,  finetune=False, in_meanpool=[[2,1]], hybrid=False):
         super().__init__()
+        self.hybrid = hybrid
+        self.middle_layer = in_meanpool[1][0]-1
         self.encoder = WavLMModel.from_pretrained('microsoft/wavlm-base-plus')
         print("Using Modified WavLM encoder")
 
@@ -61,13 +63,19 @@ class ModifiedWavLMAudioEncoder(nn.Module):
 
         for param in self.encoder.parameters():
             param.requires_grad = False
-        for param in self.encoder.encoder.layers[ft_layers[0]:min(ft_layers[1], num_layers)].parameters():
-            param.requires_grad = True
+        # for param in self.encoder.encoder.layers[ft_layers[0]:min(ft_layers[1], num_layers)].parameters():
+        #     param.requires_grad = True
+        for layer in in_meanpool:
+            for param in self.encoder.encoder.layers[layer+1].parameters():
+                param.requires_grad = True
         # for param in self.encoder.encoder.layers[-15:].parameters():
         #     param.requires_grad = finetune
+        
+        if self.hybrid:print(f"in case of quicker exit for short segments, will exit after layer {self.middle_layer}")
 
-    def forward(self, x):
-        return self.encoder(x).last_hidden_state
+    def forward(self, x, out_middle=False):
+        if out_middle and self.hybrid: return self.encoder(x).hidden_states[self.middle_layer] 
+        else: return self.encoder(x).last_hidden_state
 
 
 import torch.nn.functional as F

@@ -6,8 +6,8 @@
 #SBATCH --gpus=1  #number of gpus requested
 #SBATCH --partition=gpu-a100   #queue
 #SBATCH --account=a100acct
-#SBATCH --error=logs/TASLP_clean/test/A_wavlm-base-plus_cnn_TinyLlama_str2_mp50_Sum_%j.log
-#SBATCH --output=logs/TASLP_clean/test/A_wavlm-base-plus_cnn_TinyLlama_str2_mp50_Sum_%j.log
+#SBATCH --error=logs/TASLP_clean/test/A_wavlm-base-plus_linear_TinyLlama_mp10_Sum_%j.log
+#SBATCH --output=logs/TASLP_clean/test/A_wavlm-base-plus_linear_TinyLlama_mp10_Sum_%j.log
 
 export HF_HOME=./hf_cache/
 export HF_DATASETS_CACHE=./hf_cache/
@@ -18,12 +18,12 @@ export 'PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512'
 
 python3 test.py \
     --encoder 'microsoft/wavlm-base-plus' \
-    --connector 'cnn_str1.2.1' \
+    --connector 'linear' \
     --llm 'TinyLlama-1.1B-Chat-v1.0' \
     --batch-size 1 \
     --lr 0.0001 \
-    --meanpool 50 \
+    --meanpool 10 \
     --group 'TASLP_v2' \
     --use-config summarize_switchboard.json \
-    --total-testing-epoch 50
+    --epoch-to-test 17 \
 
