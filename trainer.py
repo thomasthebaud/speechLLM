@@ -71,6 +71,8 @@ class SpeechLLMLightning(pl.LightningModule):
                 print(f"Using hybrid parameter: {connector_args['hybrid']}")
                 self.hybrid = connector_args['hybrid']
             self.modified_encoder = len(connector_args["in_meanpool"])>0
+            if self.modified_encoder: print(f"Encoder has been modified, will need longer segments than 1s or hybrid behavior for long/short segments.")
+            else: print(f"Encoder has not been modified.")
             self.audio_encoder = get_audio_encoder(audio_encoder_name, finetune_encoder, ft_layers, in_meanpool=connector_args["in_meanpool"], hybrid=self.hybrid)
         else:  
             self.modified_encoder = False
@@ -99,13 +101,13 @@ class SpeechLLMLightning(pl.LightningModule):
         optimizer = Adam(opt, lr=self.max_lr)
         return optimizer
 
-    def encode_speech_segment(self, mel, n_chunks=0,verbose=False, out_middle=False):
-        keep_it, mel = self.check_minimum_size(mel, n_chunks=n_chunks, verbose=verbose, out_middle=out_middle)
+    def encode_speech_segment(self, mel, n_chunks=0,verbose=False):
+        keep_it, mel = self.check_minimum_size(mel, n_chunks=n_chunks, verbose=verbose)
         if not keep_it: return False, 0
 
         if verbose: print(f"input mel shape = {mel.shape}")
         if self.finetune_encoder:
-            if self.modified_encoder: speech_embeds = self.audio_encoder(mel, out_middle=out_middle)
+            if self.modified_encoder: speech_embeds = self.audio_encoder(mel)
             else: speech_embeds = self.audio_encoder(mel)
         else:
             with torch.no_grad():
@@ -113,15 +115,15 @@ class SpeechLLMLightning(pl.LightningModule):
         if verbose: print(f"encoded size: {speech_embeds.shape}, {n_chunks} minutes")
         return True, speech_embeds
 
-    def check_minimum_size(self, mel, n_chunks=0, verbose=False, out_middle=False):
+    def check_minimum_size(self, mel, n_chunks=0, verbose=False):
         if not self.modified_encoder: #classic WavLM, 1sec minimum
             minimum_length = 16_000
             if n_chunks==0 or mel.shape[1]>=minimum_length: return True, mel #if it's the only chunk, it should be over 1sec, don't touch it
-            else: return False, mel #not the first, less than 1sec
-        else: #modified wavlm, 4sec mininimum
-            minimum_length = 5*16_000
-            if mel.shape[1]>=minimum_length or out_middle: return True, mel
-            elif mel.shape[1]<minimum_length and n_chunks>0: return False, mel
+            else: return False, 0 #not the first, less than 1sec
+        else: #modified wavlm, 6sec mininimum
+            minimum_length = 6*16_000
+            if mel.shape[1]>=minimum_length: return True, mel
+            elif mel.shape[1]<minimum_length and n_chunks>0: return False, 0
             else:        
                 if verbose: print(f"original mel shape = {mel.shape}")
                 while mel.shape[1]<minimum_length:
@@ -131,19 +133,20 @@ class SpeechLLMLightning(pl.LightningModule):
     def encode(self, 
         mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids, 
         return_embedding_loss=False, chunk_size=60*16_000, test_mode=False, 
-        verbose=False):
+        verbose=True):
         batch_size = mel.shape[0]
         
         #use chunks of size 1min max
+        # verbose = mel.shape[1]>60*chunk_size #if more than 60min: check length efficiency
         if verbose: print(f"mel shape = {mel.shape}")
         if self.use_audio:
             if mel.shape[1]<chunk_size:
-                _, speech_embeds = self.encode_speech_segment(mel,n_chunks=0, verbose=verbose, out_middle=self.hybrid)
+                _, speech_embeds = self.encode_speech_segment(mel,n_chunks=0, verbose=verbose)
             else:
                 chunks = mel.split(chunk_size, dim=1)
                 outs = []
                 for m,c in enumerate(chunks):
-                    keep_it, out = self.encode_speech_segment(c,m,verbose=verbose, out_middle=False)
+                    keep_it, out = self.encode_speech_segment(c,n_chunks=m,verbose=verbose)
                     if keep_it: outs.append(out)
                     else:continue
                         

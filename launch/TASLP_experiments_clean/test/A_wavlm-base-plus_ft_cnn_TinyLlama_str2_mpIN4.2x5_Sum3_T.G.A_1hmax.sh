@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --ntasks-per-node=1
 #SBATCH --mem=24000
-#SBATCH --job-name=te_S #job name
+#SBATCH --job-name=te_STGA #job name
 #SBATCH --nodes=1  #number of nodes requested
 #SBATCH --gpus=1  #number of gpus requested
 #SBATCH --partition=gpu-a100   #queue

@@ -49,8 +49,12 @@ class ModifiedWavLMAudioEncoder(nn.Module):
         old_layers = self.encoder.encoder.layers
         new_layers = []
         for i, layer in enumerate(old_layers):
-            if i in in_meanpool: new_layers.append(WavLMEncoderLayer_proxy(layer, meanpool=in_meanpool[i]))
-            else:                new_layers.append(WavLMEncoderLayer_proxy(layer, meanpool=1))
+            if not self.hybrid:
+                if i in in_meanpool: new_layers.append(WavLMEncoderLayer_proxy(layer, meanpool=in_meanpool[i]))
+                else:                new_layers.append(WavLMEncoderLayer_proxy(layer, meanpool=1))
+            else:
+                if i in in_meanpool: new_layers.append(WavLMEncoderLayer_proxy_hybrid(layer, meanpool=in_meanpool[i]))
+                else:                new_layers.append(WavLMEncoderLayer_proxy_hybrid(layer, meanpool=[1,1]))
         self.encoder.encoder.layers = nn.ModuleList(new_layers)
 
         num_layers = len(self.encoder.encoder.layers)
@@ -66,16 +70,14 @@ class ModifiedWavLMAudioEncoder(nn.Module):
         # for param in self.encoder.encoder.layers[ft_layers[0]:min(ft_layers[1], num_layers)].parameters():
         #     param.requires_grad = True
         for layer in in_meanpool:
-            for param in self.encoder.encoder.layers[layer+1].parameters():
-                param.requires_grad = True
+            if layer < len(self.encoder.encoder.layers)-1:
+                for param in self.encoder.encoder.layers[layer+1].parameters():
+                    param.requires_grad = True
         # for param in self.encoder.encoder.layers[-15:].parameters():
         #     param.requires_grad = finetune
         
-        if self.hybrid:print(f"in case of quicker exit for short segments, will exit after layer {self.middle_layer}")
-
-    def forward(self, x, out_middle=False):
-        if out_middle and self.hybrid: return self.encoder(x).hidden_states[self.middle_layer] 
-        else: return self.encoder(x).last_hidden_state
+    def forward(self, x):
+        return self.encoder(x).last_hidden_state
 
 
 import torch.nn.functional as F
@@ -101,6 +103,7 @@ class WavLMEncoderLayer_proxy(GradientCheckpointingLayer):
                     output_attentions=output_attentions,
                     index=index,
                 )
+        # print(states.shape, index)
         if self.use_pool:
             # print('before:', states.shape, attention.shape)
             states = self.pooling_1d(states.transpose(1,2)).transpose(1,2)
@@ -108,3 +111,72 @@ class WavLMEncoderLayer_proxy(GradientCheckpointingLayer):
             # print('after:', states.shape, attention.shape)
         return (states, attention)
 
+class WavLMEncoderLayer_proxy_hybrid(GradientCheckpointingLayer):
+    def __init__(self, layer, meanpool=(1,1)):
+        super().__init__()
+        self.layer = layer
+        if meanpool[0]!=1 and meanpool[1]!=1:
+            self.pooling_1d_a = AvgPool1d(meanpool[0], stride=meanpool[0])
+            self.pooling_2d_a = AvgPool2d(meanpool[0], stride=meanpool[0])
+            self.pooling_1d_b = AvgPool1d(meanpool[1], stride=meanpool[1])
+            self.pooling_2d_b = AvgPool2d(meanpool[1], stride=meanpool[1])
+            self.use_pool=True
+        else:
+            self.use_pool=False
+
+        # for 1 min, shapes of the inputs for "in_meanpool":[[7,4],[8,4],[9,4],[10,4]]
+        # torch.Size([1, 2999, 768]) 0
+        # torch.Size([1, 2999, 768]) 1
+        # torch.Size([1, 2999, 768]) 2
+        # torch.Size([1, 2999, 768]) 3
+        # torch.Size([1, 2999, 768]) 4 
+        # torch.Size([1, 2999, 768]) 5
+        # torch.Size([1, 2999, 768]) 6
+        # torch.Size([1, 2999, 768]) 7
+        # torch.Size([1, 749, 768]) 8
+        # torch.Size([1, 187, 768]) 9
+        # torch.Size([1, 46, 768]) 10
+        # torch.Size([1, 11, 768]) 11
+
+        # for 1 min, shapes of the inputs for "in_meanpool":[[7,2],[8,2],[9,2],[10,2]]
+        # torch.Size([1, 2999, 768]) 0
+        # torch.Size([1, 2999, 768]) 1
+        # torch.Size([1, 2999, 768]) 2
+        # torch.Size([1, 2999, 768]) 3
+        # torch.Size([1, 2999, 768]) 4 
+        # torch.Size([1, 2999, 768]) 5
+        # torch.Size([1, 2999, 768]) 6
+        # torch.Size([1, 2999, 768]) 7
+        # torch.Size([1, 1499, 768]) 8
+        # torch.Size([1, 749, 768]) 9
+        # torch.Size([1, 374, 768]) 10
+        # torch.Size([1, 187, 768]) 11
+
+    def forward(self, hidden_states, attention_mask=None, position_bias=None, output_attentions=False, index=0):
+        states, attention = self.layer(
+                    hidden_states,
+                    attention_mask=attention_mask,
+                    position_bias=position_bias,
+                    output_attentions=output_attentions,
+                    index=index,
+                )
+        path_b=False
+        if index<5 and states.shape[1]<2998:path_b==True
+        # print(states.shape, index)
+        if self.use_pool:
+            # print('before:', states.shape, attention.shape)
+            if (
+                (index==7 and states.shape[1]!=2999) or 
+                (index==8 and states.shape[1]!=749) or 
+                (index==9 and states.shape[1]!=187) or 
+                (index==10 and states.shape[1]!=46)
+            ):path_b=True
+
+            if path_b:
+                states = self.pooling_1d_b(states.transpose(1,2)).transpose(1,2)
+                attention = self.pooling_2d_b(attention)
+            else:
+                states = self.pooling_1d_a(states.transpose(1,2)).transpose(1,2)
+                attention = self.pooling_2d_a(attention)
+            # print('after:', states.shape, attention.shape)
+        return (states, attention)

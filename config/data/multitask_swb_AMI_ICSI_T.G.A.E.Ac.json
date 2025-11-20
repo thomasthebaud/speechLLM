@@ -1,0 +1,35 @@
+
+{
+    "train":
+    {
+        "iemocap_ses01-03":["emotion", "gender"],
+        "switchboard_train":["summary"],
+        "AMI_train":["summary"],
+        "ICSI_train":["summary"],
+        "CV-EN_train":["accent", "transcript", "gender"],
+        "voxceleb2_enriched_dev":["age", "gender"],
+        "librispeech_train-clean-360":["transcript", "gender"]
+    },
+    "dev":
+    {
+        "iemocap_ses04":["emotion"],
+        "switchboard_val":["summary"],
+        "AMI_val":["summary"],
+        "ICSI_val":["summary"],
+        "CV-EN_dev":["accent"],
+        "voxceleb2_enriched_test":["age", "gender"],
+        "librispeech_dev-clean":["transcript"],
+        "librispeech_dev-other":["transcript"]
+    },
+    "test":
+    {
+        "iemocap_ses05":["emotion"],
+        "switchboard_test":["summary"],
+        "AMI_test":["summary"],
+        "ICSI_test":["summary"],
+        "CV-EN_test":["accent"],
+        "voxceleb2_enriched_test":["age", "gender"],
+        "librispeech_test-clean":["transcript"],
+        "librispeech_test-other":["transcript"]
+    }        
+}
