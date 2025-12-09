@@ -1,7 +1,7 @@
 # SpeechLLM
 Repository adapted from https://github.com/skit-ai/SpeechLLM/tree/main
 
-Propose the training and testing of Speech LLMs for speaker characterization and summarization, adapted for the CLSP grid.
+Propose the training and testing of Speech LLMs for speaker characterization and summarization, adapted for the JHU-CLSP grid.
 
 # Options Available right now
 ## Datasets
@@ -14,6 +14,8 @@ The following datasets have been adapted and can be used for training, with the 
 | Librispeech | train-clean-100, train-clean-360, train-other-500 | dev-clean, dev-other | test-clean, test-other | gender, transcript |
 | MSP podcast | train | validation | test | 8 Cat. emotions, gender | 
 | Switchboard | train | validation | test | transcript, summary |
+| AMI | train | validation | test | summary |
+| ICSI | train | validation | test | summary |
 | VoxCeleb1 | dev | test | test | gender, accent (from nationality) |
 | VoxCeleb2-AE | dev | test | test | gender, age, accent (from nationality) |
 | WSJ0 | si_tr_s | si_dt_05 | si_et_05 | gender, transcript |
@@ -52,8 +54,18 @@ If ```--use-text``` is passed, transcripts will be added as inputs when availabl
 If ```--no-audio``` is passed, only the transcripts will be used, no encoder nor connector will be initialized nor used. <br>
 
 ### Configurations
-Training configurations are defined in the folder ```configs```, they can be passed as arguments ```--use-config summarize_switchboard.json```.
+Training configurations are defined in the folder ```config```.
+
+#### Data config
+In the ```config/data/``` folder, you can find the dataset configuration files. 
+They can be passed as arguments ```--use-config summarize_switchboard.json```.
 They define which dataset should be used for training, testing and validation, and which tasks should be used for each.
+
+#### Connector config
+In the ```config/model/``` folder, you can find the connector configuration files. 
+They can be passed as arguments ```--connector cnn_str1.2.1```.
+They define which connector should be used, which part of the encoder to fine-tune, the meanpooling parameters, etc...
+
 <br>
 Trains up to ```--total-training-epoch``` maximum training epochs. top 3 models saved in ```checkpoints/```. Uses ```--epoch-to-test``` to test a specific epoch.
 
@@ -81,6 +93,9 @@ To test it, use
 ```
 sbatch launch/$expe_series/test/$your_script.sh
 ```
+
+### Reproducibility
+#### ASRU 2025 article: Enhancing Dialogue Annotation with Speaker Characteristics Leveraging a Frozen LLM
 The experiments with simple linear layer for speaker characterization are available in ```launch/ASRU2025```, allowing partial reproduction of this article: [*Enhancing Dialogue Annotation with Speaker Characteristics Leveraging a Frozen LLM*](https://arxiv.org/pdf/2508.04795).
 Please cite this if you use those experiments:
 ```
@@ -91,8 +106,10 @@ Please cite this if you use those experiments:
   year={2025}
 }
 ```
-<br>
-The experiments with CNN connector for audio summarization are available in ```launch/ICASSP2025```. The article was not submitted, it will be to a different venue.
+
+#### [Work in progress] TASLP article: SumSLM: a Speech-Aware Language Model for Long-Form Conversations Summarization
+The experiments with CNN connector for audio summarization are available in ```launch/TASLP_experiments_clean```.
+
 <br>
 
 # Contact
