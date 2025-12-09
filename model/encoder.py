@@ -166,6 +166,7 @@ class WavLMEncoderLayer_proxy_hybrid(GradientCheckpointingLayer):
         if self.use_pool:
             # print('before:', states.shape, attention.shape)
             if (
+                (index<7 and states.shape[1]<2999) or
                 (index==7 and states.shape[1]!=2999) or 
                 (index==8 and states.shape[1]!=749) or 
                 (index==9 and states.shape[1]!=187) or 

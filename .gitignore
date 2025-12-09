@@ -19,4 +19,5 @@ tmp*
 local/*/*.ipynb
 launch/ICASSP2026_experiments
 launch/older_experiments
+launch/TASLP_experiments
 wanbd

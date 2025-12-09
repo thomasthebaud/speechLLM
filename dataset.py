@@ -108,6 +108,7 @@ class AudioDataset(Dataset):
         self.mode = mode
         if len(fields)==0: self.labels = ['transcript', 'gender', 'emotion', 'age', 'accent', 'noises', 'summary'] #'isspeech', 
         else: self.labels = fields
+        if "summary" not in self.labels: max_len=59
         self.max_len = max_len*16_000
         self.random_keys_prob=random_keys_prob
         self.use_text=use_text

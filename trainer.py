@@ -78,6 +78,7 @@ class SpeechLLMLightning(pl.LightningModule):
             self.modified_encoder = False
             self.audio_encoder = get_audio_encoder(audio_encoder_name, finetune_encoder, ft_layers)
         self.connector = get_connector(connector_args)
+        self.short_connector = get_connector(connector_args)
         self.pooling = MeanPooler(k=meanpool)
         self.llm_tokenizer, self.llm_model = get_llm(llm_name, use_lora, lora_r, lora_alpha)
         
@@ -96,6 +97,7 @@ class SpeechLLMLightning(pl.LightningModule):
         opt = [
             {"params": self.audio_encoder.parameters(), "lr": self.enc_lr if (self.finetune_encoder and self.use_audio) else 0},
             {"params": self.connector.parameters(), "lr": self.max_lr if self.use_audio else 0},
+            {"params": self.short_connector.parameters(), "lr": self.max_lr if self.use_audio else 0},
             {"params": self.llm_model.parameters(), "lr": self.max_lr if self.use_lora else 0},
         ]
         optimizer = Adam(opt, lr=self.max_lr)
@@ -133,7 +135,7 @@ class SpeechLLMLightning(pl.LightningModule):
     def encode(self, 
         mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids, 
         return_embedding_loss=False, chunk_size=60*16_000, test_mode=False, 
-        verbose=True):
+        verbose=False):
         batch_size = mel.shape[0]
         
         #use chunks of size 1min max
@@ -142,6 +144,8 @@ class SpeechLLMLightning(pl.LightningModule):
         if self.use_audio:
             if mel.shape[1]<chunk_size:
                 _, speech_embeds = self.encode_speech_segment(mel,n_chunks=0, verbose=verbose)
+                if self.hybrid: speech_embeds = self.short_connector(self.pooling(speech_embeds))
+                else:  speech_embeds = self.connector(self.pooling(speech_embeds))
             else:
                 chunks = mel.split(chunk_size, dim=1)
                 outs = []
@@ -159,7 +163,7 @@ class SpeechLLMLightning(pl.LightningModule):
                 del chunks
                 del outs
 
-            speech_embeds = self.connector(self.pooling(speech_embeds))
+                speech_embeds = self.connector(self.pooling(speech_embeds))
             # print(f"output speech embeddings: {speech_embeds.shape}")
 
 
