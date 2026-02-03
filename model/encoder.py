@@ -6,7 +6,9 @@ from numpy import min as npmin
 #from speechtokenizer import SpeechTokenizer
 
 def get_audio_encoder(name, finetune_encoder,ft_layers, in_meanpool=[], hybrid=False):
-    if name in ["facebook/hubert-xlarge-ll60k", "microsoft/wavlm-large", 'microsoft/wavlm-base-plus']:
+    if 'precomputed' in name:
+        return nn.Identity()
+    elif name in ["facebook/hubert-xlarge-ll60k", "microsoft/wavlm-large", 'microsoft/wavlm-base-plus']:
         # return TransformerAudioEncoder(model_name=name, finetune=finetune_encoder)
         if len(in_meanpool)>0 and name=='microsoft/wavlm-base-plus': return ModifiedWavLMAudioEncoder(ft_layers, finetune=finetune_encoder, in_meanpool=in_meanpool, hybrid=hybrid)
         else: return TransformerAudioEncoder(ft_layers, model_name=name, finetune=finetune_encoder)

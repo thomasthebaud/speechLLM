@@ -1,0 +1,14 @@
+{
+    "train":
+    {
+        "voxceleb2_npy_dev_train":["speaker"]
+    },
+    "dev":
+    {
+        "voxceleb2_npy_dev_valid":["speaker"]
+    },
+    "test":
+    {
+        "voxceleb1_npy_test-o":["speaker"]
+    }        
+}

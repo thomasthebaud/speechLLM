@@ -2,12 +2,13 @@ import pandas as pd
 
 def save_csv(df, dataset, set, target="/home/tthebau1/EDART/SpeechLLM/data/"):
     pd.options.mode.chained_assignment = None
-    columns = ['transcript','gender','emotion','age','accent', 'noises', 'summary']
+    columns = ['transcript','gender','emotion','age','accent', 'noises', 'summary', 'speaker']
     df['dataset'] = dataset
     df['set'] = set
     df['isspeech'] = True
-    assert 'audio_path' in df.columns, f"audio_path not found in {dataset} {set}"
-    assert 'audio_len' in df.columns, f"audio_len not found in {dataset} {set}"
+
+    # assert (('audio_path' in df.columns) and ('audio_len' in df.columns)) or 'embedding_path' in df.columns, f"audio_path or audio_len not found in {dataset} {set}"
+    
     for col in columns:
         if col not in df.columns: df[col]=None
 
