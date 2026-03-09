@@ -6,8 +6,8 @@
 #SBATCH --gpus=1  #number of gpus requested
 #SBATCH --partition=gpu-a100   #queue
 #SBATCH --account=a100acct
-#SBATCH --error=logs/ASV_LLM/test/EcapaTDNN_linear_TinyLlama_ASV_%j.log
-#SBATCH --output=logs/ASV_LLM/test/EcapaTDNN_linear_TinyLlama_ASV_%j.log
+#SBATCH --error=logs/ASV_LLM/test/EcapaTDNN_linear_TinyLlama_ASV_xs_%j.log
+#SBATCH --output=logs/ASV_LLM/test/EcapaTDNN_linear_TinyLlama_ASV_xs_%j.log
 
 export HF_HOME=./hf_cache/
 export HF_DATASETS_CACHE=./hf_cache/
@@ -17,6 +17,8 @@ echo `date`
 export TOKENIZERS_PARALLELISM=false
 export 'PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512'
 
+#64 OOM
+
 python3 test_ASV.py \
     --encoder 'precomputed/ecapa-tdnn' \
     --connector 'linear192' \
@@ -24,7 +26,7 @@ python3 test_ASV.py \
     --batch-size 32 \
     --lr 0.0001 \
     --group 'ASV' \
-    --use-config ASV_voxceleb2_ecapatdnn.json \
-    --epoch-to-test 23 \
-    --nickname "_ASV"
+    --use-config ASV_voxceleb2_XS_ecapatdnn.json \
+    --epoch-to-test 59 \
+    --nickname "_ASV_xs"
 

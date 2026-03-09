@@ -37,40 +37,41 @@ if __name__ == "__main__":
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)
 
-    test_set = list(model_config['test_sets'].keys())[0]
-    print(f"Using dataset {test_set}")
-    if 'precomputed' in model_config['audio_encoder_name']: 
-        test_dataset = TestInstructionalNumpyDataset(csv_file=f'./data/{test_set}.csv')
-    else:
-        test_dataset = InstructionalAudioDataset(
-            csv_file=f'./data/{test_set}.csv',
-            mode='test', 
-            max_len=60
-            )
 
-    log_dir = f"exp/test_predictions/{model_config['model_name']}/{test_set}"
-    try:
-        os.makedirs(log_dir)
-    except:
-        print(f"{log_dir} exists")
-    #update logger
-    logger.handlers.clear()
-    file_handler = logging.FileHandler(f"{log_dir}/{version}.txt", mode="w")
-    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-    file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
+    for test_set in list(model_config['test_sets'].keys()):
+        print(f"Using dataset {test_set}")
+        if 'precomputed' in model_config['audio_encoder_name']: 
+            test_dataset = TestInstructionalNumpyDataset(csv_file=f'./data/{test_set}.csv')
+        else:
+            test_dataset = InstructionalAudioDataset(
+                csv_file=f'./data/{test_set}.csv',
+                mode='test', 
+                max_len=60
+                )
 
-    print(f"Testing {test_set}")
-    print("Warning: Using fixed batch size of 64!")
-    my_collator = TestCollator(model_config['audio_encoder_name'], tokenizer)
-    test_loader = data_utils.DataLoader(test_dataset, 
-            batch_size=64, 
-            shuffle=False, 
-            collate_fn=my_collator, 
-            num_workers=3)
+        log_dir = f"exp/test_predictions/{model_config['model_name']}/{test_set}"
+        try:
+            os.makedirs(log_dir)
+        except:
+            print(f"{log_dir} exists")
+        #update logger
+        logger.handlers.clear()
+        file_handler = logging.FileHandler(f"{log_dir}/{version}.txt", mode="w")
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
 
-    trainer.test(model=model, dataloaders=test_loader)
+        print(f"Testing {test_set}")
+        print("Warning: Using fixed batch size of 64!")
+        my_collator = TestCollator(model_config['audio_encoder_name'], tokenizer)
+        test_loader = data_utils.DataLoader(test_dataset, 
+                batch_size=64, 
+                shuffle=False, 
+                collate_fn=my_collator, 
+                num_workers=3)
 
-    #kill logger
-    logger.removeHandler(file_handler)
-    file_handler.close()
+        trainer.test(model=model, dataloaders=test_loader)
+
+        #kill logger
+        logger.removeHandler(file_handler)
+        file_handler.close()

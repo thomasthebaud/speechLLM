@@ -112,7 +112,6 @@ class MyCollator:
             post_tokenized_ids.append(post)
             output_tokenized_ids.append(out_neg)
             
-
         return (
             self.pad(enroll_mel), 
             self.pad(test_mel),
@@ -227,7 +226,9 @@ class NumpyDataset(Dataset):
         return len(self.data_frame)
 
     def load_embedding(self, emb_path):
-        return torch.from_numpy(np.load(emb_path)).unsqueeze(0)
+        emb = torch.from_numpy(np.load(emb_path))
+        if len(emb.shape)<2: emb = emb.unsqueeze(0)
+        return emb
     
     def __getitem__(self, idx):
         # Load audio
@@ -255,7 +256,10 @@ class TestNumpyDataset(Dataset):
     def __len__(self):
         return len(self.data_frame)
 
-    def load_embedding(self, emb_path): return torch.from_numpy(np.load(emb_path)).unsqueeze(0)
+    def load_embedding(self, emb_path): 
+        emb = torch.from_numpy(np.load(emb_path))
+        if len(emb.shape)<2: emb = emb.unsqueeze(0)
+        return emb
     
     def __getitem__(self, idx):
         # Load audio

@@ -11,8 +11,10 @@ from jiwer import wer
 import torchmetrics
 import random
 import re
+import os
 import json
 
+import datetime
 from model.encoder import get_audio_encoder, TransformerAudioEncoder
 from model.connector import get_connector, CNNConnector
 from model.llm import get_llm
@@ -77,11 +79,12 @@ class SpeechLLMLightning(pl.LightningModule):
         else:  
             self.modified_encoder = False
             self.audio_encoder = get_audio_encoder(audio_encoder_name, finetune_encoder, ft_layers)
+        print("Encoder Loaded")
         self.connector = get_connector(connector_args)
         self.pooling = MeanPooler(k=meanpool)
-
+        print("Connector Loaded")
         self.llm_tokenizer, self.llm_model = get_llm(llm_name, use_lora, lora_r, lora_alpha)
-        
+        print("LLM Loaded")
         self.max_lr = max_lr
         self.enc_lr = enc_lr
         self.total_training_step = total_training_step
@@ -135,9 +138,12 @@ class SpeechLLMLightning(pl.LightningModule):
         speech_embeds = torch.cat((enroll_speech_embeds, test_speech_embeds), dim=1)
         # print(f"output speech embeddings: {speech_embeds.shape}")
 
-
-        if self.use_lora: embedder = self.llm_model.model.model.embed_tokens
-        else: embedder = self.llm_model.model.embed_tokens
+        if 'mistralai' in self.llm_name:
+            if self.use_lora: embedder = self.llm_model.model.model.get_input_embeddings()
+            else: embedder = self.llm_model.model.get_input_embeddings()
+        else:
+            if self.use_lora: embedder = self.llm_model.model.model.embed_tokens
+            else: embedder = self.llm_model.model.embed_tokens
 
         pre_prompt_embeds = embedder(pre_tokenized_ids)
         post_prompt_embeds = embedder(post_tokenized_ids)
@@ -153,8 +159,8 @@ class SpeechLLMLightning(pl.LightningModule):
         input_token_length+=post_prompt_embeds.shape[1]
 
         if not test_mode: cat_embs.append(output_prompt_embeds)
-
-        combined_embeds = torch.cat(cat_embs, dim=1)
+        dtype = self.llm_model.dtype
+        combined_embeds = torch.cat(cat_embs, dim=1).to(dtype)
         atts = torch.ones(combined_embeds.size()[:-1], dtype=torch.long).to(combined_embeds.device)
 
         label_ids = torch.cat([
@@ -164,6 +170,7 @@ class SpeechLLMLightning(pl.LightningModule):
         return combined_embeds, atts, label_ids
 
     def forward(self, embeds, atts, label_ids):
+        # print(embeds.dtype, atts.dtype, label_ids.dtype)
         out = self.llm_model(
             inputs_embeds=embeds,
             attention_mask=atts,
@@ -171,13 +178,15 @@ class SpeechLLMLightning(pl.LightningModule):
         )
         return out
 
-    def generate(self, embeds, max_new_tokens=2048):
+    def generate(self, embeds, max_new_tokens=32):
+        # print(f"\n[{datetime.datetime.now().strftime('%H:%M:%S')}] start generate, {embeds.shape}")
         outputs = self.llm_model.generate(
             inputs_embeds=embeds,
             max_new_tokens=max_new_tokens,
             return_dict_in_generate=True, output_scores=True
         )
         scores = outputs.scores
+        # print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] end of generate.")
         return outputs.sequences, [F.softmax(sc.detach().cpu(), dim=-1).numpy() for sc in scores]
     
     def training_step(self, batch, batch_idx):
@@ -190,6 +199,7 @@ class SpeechLLMLightning(pl.LightningModule):
         return loss
     
     def validation_step(self, batch, batch_idx):
+        # print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] Start validation step.")
         enroll_mel, test_mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids = batch
         embeds, atts, label_ids = self.encode(enroll_mel, test_mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids, test_mode=False)
         outputs = self.forward(embeds, atts, label_ids)
@@ -213,6 +223,7 @@ class SpeechLLMLightning(pl.LightningModule):
             wandb.log({
                 f"val_sample_{sample_idx}_out_label": wandb.Html(f"<pre>{lab} -> {out}</pre>"),
             }, commit=False)
+        # print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] end validation step.")
 
         return {"val_loss": loss}
 
@@ -220,7 +231,8 @@ class SpeechLLMLightning(pl.LightningModule):
         # store on CPU to avoid GPU memory growth
         self._test_scores = []
         self._test_labels = []
-        
+        self.root_embeddings = 'exp/llm_scores/ASV_'+self.llm_name.split('/')[-1]
+        if not os.path.exists(self.root_embeddings): os.makedirs(self.root_embeddings, exist_ok=True)
     
     def test_step(self, batch, batch_idx):
         enroll_mel, test_mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids = batch
@@ -239,6 +251,7 @@ class SpeechLLMLightning(pl.LightningModule):
         # Scores are (L, B, D) outputs = tensor([[   1, 4874,  2],[   1,  694,    2]
         batch_size = predicted_ids.shape[0]
         accuracy, prob_yes, prob_no, yes_or_no = [], [], [], []
+        
         for b in range(batch_size):
             generated_output_text = self.llm_tokenizer.decode(predicted_ids[b], skip_special_tokens=False).lower()
             target_text = self.llm_tokenizer.decode(output_tokenized_ids[b], skip_special_tokens=False).lower()
@@ -251,10 +264,17 @@ class SpeechLLMLightning(pl.LightningModule):
             self._test_scores.append(np.max([s[b, 694] for s in scores])/np.max([s[b, 4874] for s in scores]))
             self._test_labels.append(int('yes' in target_text))
 
+            # if v=='test':self.save_scores([s[b] for s in scores], int('yes' in target_text))
+
         self.log(f"{v}/accuracy", float(100*np.mean(accuracy)), on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
         self.log(f"{v}/yes_or_no", float(100*np.mean(yes_or_no)), on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
         self.log(f"{v}/prob_yes_on_yes", float(100*np.mean(prob_yes)), on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
         self.log(f"{v}/prob_no_on_no", float(100*np.mean(prob_no)), on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+
+    def save_scores(self, score_list, target_bool):
+        score_array = np.array(score_list)
+        # print(score_array.shape)
+        np.save(f"{self.root_embeddings}/{len(self._test_labels)}_{target_bool}.npy", score_array)
 
     def on_test_epoch_end(self):
         eer = self.get_EER()

@@ -108,6 +108,7 @@ def get_model_config():
     
     # LLM
     if args.llm=='TinyLlama-1.1B-Chat-v1.0':llm_name="TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+    if args.llm=='Ministral-3-3B-Base-2512':llm_name="mistralai/Ministral-3-3B-Base-2512"
 
     # Get all infos
     model_config = {
@@ -129,9 +130,9 @@ def get_model_config():
                 'batch_size':batch_size,
                 'total_training_epoch': int(args.total_training_epoch),
                 'warmup_steps': 100,
-                'grad_accumulate_steps': 64//batch_size,
+                'grad_accumulate_steps': 1,
                 'max_number_seconds': args.truncate_sec,
-                'train_batch_per_epoch': 4090,#20_000
+                'train_batch_per_epoch': 4096,#20_000
                 'train_sets':datasets['train'],
                 'dev_sets':datasets['dev'],
                 'test_sets':datasets['test'],

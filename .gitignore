@@ -22,3 +22,5 @@ launch/older_experiments
 launch/TASLP_experiments
 wanbd
 speechbrain
+local/ASV_experiments/*.secret
+local/ASV_experiments/*.csv
