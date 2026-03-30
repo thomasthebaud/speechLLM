@@ -7,12 +7,17 @@ import mutagen
 
 from save_csv import save_csv
 
+accent_dic = {'ireland':'UK', 'canada':'USA', 'malaysia':'OTHER', 'australia':'OTHER', 
+              'england':'UK', 'us':'USA', 'other':'OTHER', 'wales':'UK', 'indian':'OTHER', 'bermuda':'OTHER', 
+              'scotland':'UK', 'hongkong':'OTHER', 'african':'OTHER', 'singapore':'OTHER', 'newzealand':'OTHER', 
+              'southatlandtic':'OTHER', 'philippines':'OTHER'}
 root = '/export/corpora5/CommonVoice/en_1488h_2019-12-10/'
-for split in ['train', 'test', 'dev']:
+for split in ['test', 'train', 'dev']:
     metadata = pd.read_csv(root+split+'.tsv', sep='\t')
     print(f"loaded {split} metadata for {len(metadata)} files")
     metadata = metadata[metadata['accent'].notnull()]
-    metadata = metadata[metadata['accent']!='other']
+    metadata['accent'] = [accent_dic[acc] for acc in metadata['accent']]
+    # metadata = metadata[metadata['accent']!='other']
     metadata = metadata[metadata['age'].notnull()]
     metadata = metadata[metadata['age']!='other']
     metadata = metadata[metadata['gender'].notnull()]

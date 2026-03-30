@@ -6,8 +6,8 @@
 #SBATCH --gpus=1  #number of gpus requested
 #SBATCH --partition=gpu-a100   #queue
 #SBATCH --account=a100acct
-#SBATCH --error=logs/TASLP_clean/train/A_wavlm-base-plus_cnn_TinyLlama_str2_mp5_Sum_%j.log
-#SBATCH --output=logs/TASLP_clean/train/A_wavlm-base-plus_cnn_TinyLlama_str2_mp5_Sum_%j.log
+#SBATCH --error=logs/TASLP_clean/train/A_wavlm-base-plus_cnn_TinyLlama_str2_mp2_Sum_%j.log
+#SBATCH --output=logs/TASLP_clean/train/A_wavlm-base-plus_cnn_TinyLlama_str2_mp2_Sum_%j.log
 
 export HF_HOME=./hf_cache/
 export HF_DATASETS_CACHE=./hf_cache/
@@ -22,7 +22,7 @@ python3 train.py \
     --llm 'TinyLlama-1.1B-Chat-v1.0' \
     --batch-size 1 \
     --lr 0.0001 \
-    --meanpool 5 \
+    --meanpool 2 \
     --group 'MP_study_TASLP' \
     --use-config summarize_switchboard.json \
     --total-training-epoch 30

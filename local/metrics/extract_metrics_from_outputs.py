@@ -18,84 +18,86 @@ if __name__=="__main__":
     for dataset in os.listdir(f"exp/test_predictions/{model_name}"):
         if dataset[-4:]=='.csv':continue
         metrics[dataset]={}
-        for output_file in os.listdir(f"exp/test_predictions/{model_name}/{dataset}/A"):
-            model_epoch=output_file[len(model_name):-4]
-            metrics[dataset][model_epoch]={}
-            with open(f"exp/test_predictions/{model_name}/{dataset}/A/{output_file}", 'r') as f:
-                outputs = f.readlines()
-            outputs = [l.strip('\n').replace("', '", "\", \"").replace("': '", "\": \"").replace("': \"", "\": \"").replace("\": '", "\": \"").replace("'}", "\"}").replace("{'", "{\"").replace("\", '", "\", \"").replace("', \"", "\", \"") for l in outputs]
+        methods = os.listdir(f"exp/test_predictions/{model_name}/{dataset}/")
+        for method in methods:
+            for output_file in os.listdir(f"exp/test_predictions/{model_name}/{dataset}/{method}"):
+                model_epoch=output_file[len(model_name):-4]
+                metrics[dataset][model_epoch]={}
+                with open(f"exp/test_predictions/{model_name}/{dataset}/{method}/{output_file}", 'r') as f:
+                    outputs = f.readlines()
+                outputs = [l.strip('\n').replace("', '", "\", \"").replace("': '", "\": \"").replace("': \"", "\": \"").replace("\": '", "\": \"").replace("'}", "\"}").replace("{'", "{\"").replace("\", '", "\", \"").replace("', \"", "\", \"") for l in outputs]
 
-            hyp_ = [l.split('INFO - [TARGET]')[1] for l in outputs if 'INFO - [TARGET]' in l]
-            pred_ = [l.split('INFO - [PREDICTION]')[1] for l in outputs if 'INFO - [PREDICTION]' in l]
-            assert len(hyp_)==len(pred_)
-            hyp, pred = [], []
-            for original_hyp, original_pred in zip(hyp_, pred_):
-                try:
-                    hyp.append(json.loads(fr"{original_hyp}"))
-                    pred.append(json.loads(fr"{original_pred}"))
-                except:
-                    print(f"Failed to process:\nhyp:{original_hyp}\npred:{original_pred}")
-                    continue
-            
-            keys = hyp[0].keys()
-            print(keys)
-            outputs = {key:{'pred':[], 'hyp':[], 'miss':0} for key in keys}
-            for h, p in zip(hyp, pred):
-                for key in h:
-                    if p[key]=='NA':outputs[key]['miss']+=1
-                    else:
-                        outputs[key]['hyp'].append(h[key])
-                        outputs[key]['pred'].append(p[key])
-
-            if 'Transcript' in outputs:
-                wer_list = [
-                    wer(target_transcript.lower(), predicted_transcript.lower()) 
-                    for target_transcript, predicted_transcript in zip(outputs['Transcript']['hyp'], outputs['Transcript']['pred'])
-                    ]
-                metrics[dataset][model_epoch]['WER_Transcript'] = 100*float(np.mean(wer_list))
-            if 'Response' in outputs:
-                wer_list = [
-                    wer(target_transcript.lower(), predicted_transcript.lower()) 
-                    for target_transcript, predicted_transcript in zip(outputs['Response']['hyp'], outputs['Response']['pred'])
-                    ]
-                metrics[dataset][model_epoch]['WER_Response'] = 100*float(np.mean(wer_list))
-            if 'Summary' in outputs:
-                scorer_list = [
-                    rouge_scorer_.score(target_sum.lower(),predicted_sum.lower())
-                    for target_sum, predicted_sum in zip(outputs['Summary']['hyp'], outputs['Summary']['pred'])
-                    ]
-                rouge_1 = [r_scores['rouge1'].precision for r_scores in scorer_list]
-                rouge_L = [r_scores['rougeL'].precision for r_scores in scorer_list]
-                rouge_2 = [r_scores['rouge2'].precision for r_scores in scorer_list]
-                metrics[dataset][model_epoch]['Rouge_1_Summary'] = np.mean(rouge_1)
-                metrics[dataset][model_epoch]['Rouge_L_Summary'] = np.mean(rouge_L)
-                metrics[dataset][model_epoch]['Rouge_2_Summary'] = np.mean(rouge_2)
-
-            if 'Age' in outputs:
-                age_list = [
-                    MAE(int(float(target_age)),int(float(predicted_age))) 
-                    for target_age, predicted_age in zip(outputs['Age']['hyp'], outputs['Age']['pred'])
-                    ]
-                metrics[dataset][model_epoch]['MAE_Age'] = float(np.mean(age_list))
-
-            for field in ['SpeechActivity', 'Gender', 'Emotion', 'Accent', 'Noises']:
-                if field in outputs:
-                    raw_hyp, raw_pred = outputs[field]['hyp'], outputs[field]['pred']
-                    labels_hyp = {lab:idx for idx, lab in enumerate(list(set(raw_hyp)))}
-                    labels_pred = {lab:idx for idx, lab in enumerate(list(set(raw_pred)))}
-                    idx_hyp = [labels_hyp[i] for i in raw_hyp]
-                    idx_pred = [labels_pred[i] for i in raw_pred]
-                    # print(field, set(raw_hyp), set(raw_pred))
-
-                    metrics[dataset][model_epoch][f'Acc_{field}'] = accuracy_score(idx_hyp, idx_pred)
-                    metrics[dataset][model_epoch][f'F1_macro_{field}'] = f1_score(idx_hyp, idx_pred, average='macro')
-
-            for field in outputs:
-                metrics[dataset][model_epoch][f'miss_{field}']=outputs[field]['miss']/(outputs[field]['miss']+len(outputs[field]['hyp']))
+                hyp_ = [l.split('INFO - [TARGET]')[1] for l in outputs if 'INFO - [TARGET]' in l]
+                pred_ = [l.split('INFO - [PREDICTION]')[1] for l in outputs if 'INFO - [PREDICTION]' in l]
+                assert len(hyp_)==len(pred_)
+                hyp, pred = [], []
+                for original_hyp, original_pred in zip(hyp_, pred_):
+                    try:
+                        hyp.append(json.loads(fr"{original_hyp}"))
+                        pred.append(json.loads(fr"{original_pred}"))
+                    except:
+                        print(f"Failed to process:\nhyp:{original_hyp}\npred:{original_pred}")
+                        continue
                 
-            # print(dataset)
-            # print(metrics[dataset])
-            # print()
+                keys = hyp[0].keys()
+                print(keys)
+                outputs = {key:{'pred':[], 'hyp':[], 'miss':0} for key in keys}
+                for h, p in zip(hyp, pred):
+                    for key in h:
+                        if p[key]=='NA':outputs[key]['miss']+=1
+                        else:
+                            outputs[key]['hyp'].append(h[key])
+                            outputs[key]['pred'].append(p[key])
+
+                if 'Transcript' in outputs:
+                    wer_list = [
+                        wer(target_transcript.lower(), predicted_transcript.lower()) 
+                        for target_transcript, predicted_transcript in zip(outputs['Transcript']['hyp'], outputs['Transcript']['pred'])
+                        ]
+                    metrics[dataset][model_epoch]['WER_Transcript'] = 100*float(np.mean(wer_list))
+                if 'Response' in outputs:
+                    wer_list = [
+                        wer(target_transcript.lower(), predicted_transcript.lower()) 
+                        for target_transcript, predicted_transcript in zip(outputs['Response']['hyp'], outputs['Response']['pred'])
+                        ]
+                    metrics[dataset][model_epoch]['WER_Response'] = 100*float(np.mean(wer_list))
+                if 'Summary' in outputs:
+                    scorer_list = [
+                        rouge_scorer_.score(target_sum.lower(),predicted_sum.lower())
+                        for target_sum, predicted_sum in zip(outputs['Summary']['hyp'], outputs['Summary']['pred'])
+                        ]
+                    rouge_1 = [r_scores['rouge1'].precision for r_scores in scorer_list]
+                    rouge_L = [r_scores['rougeL'].precision for r_scores in scorer_list]
+                    rouge_2 = [r_scores['rouge2'].precision for r_scores in scorer_list]
+                    metrics[dataset][model_epoch]['Rouge_1_Summary'] = np.mean(rouge_1)
+                    metrics[dataset][model_epoch]['Rouge_L_Summary'] = np.mean(rouge_L)
+                    metrics[dataset][model_epoch]['Rouge_2_Summary'] = np.mean(rouge_2)
+
+                if 'Age' in outputs:
+                    age_list = [
+                        MAE(int(float(target_age)),int(float(predicted_age))) 
+                        for target_age, predicted_age in zip(outputs['Age']['hyp'], outputs['Age']['pred'])
+                        ]
+                    metrics[dataset][model_epoch]['MAE_Age'] = float(np.mean(age_list))
+
+                for field in ['SpeechActivity', 'Gender', 'Emotion', 'Accent', 'Noises']:
+                    if field in outputs:
+                        raw_hyp, raw_pred = outputs[field]['hyp'], outputs[field]['pred']
+                        labels_hyp = {lab:idx for idx, lab in enumerate(list(set(raw_hyp)))}
+                        labels_pred = {lab:idx for idx, lab in enumerate(list(set(raw_pred)))}
+                        idx_hyp = [labels_hyp[i] for i in raw_hyp]
+                        idx_pred = [labels_pred[i] for i in raw_pred]
+                        # print(field, set(raw_hyp), set(raw_pred))
+
+                        metrics[dataset][model_epoch][f'Acc_{field}'] = accuracy_score(idx_hyp, idx_pred)
+                        metrics[dataset][model_epoch][f'F1_macro_{field}'] = f1_score(idx_hyp, idx_pred, average='macro')
+
+                for field in outputs:
+                    metrics[dataset][model_epoch][f'miss_{field}']=outputs[field]['miss']/(outputs[field]['miss']+len(outputs[field]['hyp']))
+                    
+                # print(dataset)
+                # print(metrics[dataset])
+                # print()
 
     all_fields = []
     all_epochs = []

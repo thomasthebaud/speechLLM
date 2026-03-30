@@ -26,6 +26,7 @@ if __name__ == "__main__":
     else:
         print("Using untrained model!")
         version='base'
+        model_config['model_name'] = 'base_TinyLLaMA'
         model = SpeechLLMLightning(**model_config)
     tokenizer = model.llm_tokenizer
     trainer = Trainer(
@@ -35,7 +36,7 @@ if __name__ == "__main__":
 
     # Create logger
     logger = logging.getLogger()
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(logging.INFO)
 
     if model_config['test_on']=='AT': text_options = [("AT", True, True), ("T", True, False), ("A", False, True)]
     elif model_config['test_on']=='T': text_options = [('T', True, False)]

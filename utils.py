@@ -130,9 +130,9 @@ def get_model_config():
                 'batch_size':batch_size,
                 'total_training_epoch': int(args.total_training_epoch),
                 'warmup_steps': 100,
-                'grad_accumulate_steps': 1,
+                'grad_accumulate_steps': 64,
                 'max_number_seconds': args.truncate_sec,
-                'train_batch_per_epoch': 4096,#20_000
+                'train_batch_per_epoch': 20_000,
                 'train_sets':datasets['train'],
                 'dev_sets':datasets['dev'],
                 'test_sets':datasets['test'],

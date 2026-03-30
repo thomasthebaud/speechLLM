@@ -60,6 +60,14 @@ class MyCollator:
         mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids, data_names = [], [], [], [], []
         for el in batch:
             m,pe,po,o,data_name = self.process(el)
+            if len(po)>2048:
+                to_add = "</transcript>\n\nOutput:\n"
+                to_add_tok = self.tokenizer(to_add, padding="do_not_pad", return_tensors='pt', truncation=False, add_special_tokens=False)["input_ids"]
+                L = len(to_add_tok)
+                print(f"dialog too long, went from {len(po)} to {1024+L}")
+                po = po[:1024+L]
+                po[1024:] = to_add_tok
+                
             mel.append(m)
             pre_tokenized_ids.append(pe)
             post_tokenized_ids.append(po)
@@ -198,12 +206,8 @@ class InstructionalAudioDataset(AudioDataset):
         pre_speech_prompt = f"Instruction:\n{instruction_phrase} - ["
         pre_speech_prompt += ', '.join(['IsSpeech' if k == 'isSpeech' else k for k in labels_str.keys()]) + "]\n\nInput:\n<speech>"
         pre_speech_prompt = pre_speech_prompt.replace("Isspeech", "SpeechActivity")
-        if self.use_text and random.random() < self.prob_text:
-            post_speech_prompt = f"</speech>\n\n<transcript>{transcript}</transcript>\n\n" + \
-             "Output:\n"
-        else:
-            post_speech_prompt = f"</speech>\n\n" + \
-                "Output:\n"
+        if self.use_text and random.random() < self.prob_text: post_speech_prompt = f"</speech>\n\n<transcript>{transcript}</transcript>\n\nOutput:\n"
+        else: post_speech_prompt = f"</speech>\n\nOutput:\n"
         output_prompt = "{"
         for key, value in labels_str.items():
             if key=="Isspeech": key = 'SpeechActivity'
