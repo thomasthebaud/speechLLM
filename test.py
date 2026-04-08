@@ -23,6 +23,10 @@ if __name__ == "__main__":
         print(f"Using epoch {model_config['epoch_to_test']} version {i}")
         if i==0: model = SpeechLLMLightning.load_from_checkpoint(f"checkpoints/{model_config['group']}/{model_config['model_name']}/{version}.ckpt")
         else:    model = SpeechLLMLightning.load_from_checkpoint(f"checkpoints/{model_config['group']}/{model_config['model_name']}/{version}-v{i}.ckpt")
+    elif model_config['epoch_to_test']==0:
+        version = 'last'
+        print(f"Using last epoch")
+        model = SpeechLLMLightning.load_from_checkpoint(f"checkpoints/{model_config['group']}/{model_config['model_name']}/{version}.ckpt")
     else:
         print("Using untrained model!")
         version='base'
@@ -33,6 +37,7 @@ if __name__ == "__main__":
         accelerator='gpu', devices=1, log_every_n_steps=100, callbacks=[TQDMProgressBar(refresh_rate=50)]
     )
     print("Model loaded")
+    precomputed_embeddings = ('precomputed' in model_config['audio_encoder_name'])
 
     # Create logger
     logger = logging.getLogger()
@@ -67,8 +72,11 @@ if __name__ == "__main__":
                 fields=model_config['test_sets'][test_set],
                 use_text=use_text,
                 prob_text=1,
-                data_name=test_set
+                data_name=test_set,
+                precomputed_embeddings=precomputed_embeddings
             )
+            
+
             my_collator = MyCollator(model_config['audio_encoder_name'], tokenizer)
             test_loader = data_utils.DataLoader(test_dataset, 
                     batch_size=model_config['batch_size'], 

@@ -48,7 +48,7 @@ def get_model_config():
     parser.add_argument("--use-text", action='store_true')
     parser.add_argument("--prob-text", default=0.5, type=float)
     parser.add_argument("--no-audio", action='store_true')
-    parser.add_argument('--epoch-to-test', default=1, type=int)
+    parser.add_argument('--epoch-to-test', default=1, type=str)
     parser.add_argument("--meanpool", default=1, type=int)
     parser.add_argument("--total-training-epoch", default=1000, type=int)
     parser.add_argument("--use-config", default=None, type=str)
@@ -92,7 +92,7 @@ def get_model_config():
     if args.meanpool!=1:            model_name = model_name+f'_mp{args.meanpool}'
     if len(connector['in_meanpool'])>0: model_name = model_name+"_inmp"+'.'.join([str(i[1]) for i in connector['in_meanpool']])
     if args.encoder_lr==-1: model_name =  f"{model_name}_lrenc{args.encoder_lr}"
-    if connector['name']=='cnn':    model_name = model_name+"_str2"#+'.'.join([str(i) for i in connector['k']])
+    if connector['name']=='cnn':    model_name = model_name+'str'+'.'.join([str(i) for i in connector['k']])
     model_name =  f"{model_name}_lr{lr}"
 
     if args.nickname!='_':          model_name = model_name + str(args.nickname)
@@ -132,7 +132,7 @@ def get_model_config():
                 'warmup_steps': 100,
                 'grad_accumulate_steps': 64,
                 'max_number_seconds': args.truncate_sec,
-                'train_batch_per_epoch': 20_000,
+                'train_batch_per_epoch': 100_000,
                 'train_sets':datasets['train'],
                 'dev_sets':datasets['dev'],
                 'test_sets':datasets['test'],
@@ -140,7 +140,7 @@ def get_model_config():
                 'log_path':log_path,
                 'group':group,
                 'model_name':model_name,
-                'epoch_to_test':int(args.epoch_to_test),
+                'epoch_to_test':int(args.epoch_to_test) if args.epoch_to_test!='last' else 0,
                 'use_summaries':use_summaries,
                 'test_on':str(args.test_on)
         }

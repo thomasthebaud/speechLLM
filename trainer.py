@@ -57,6 +57,7 @@ class SpeechLLMLightning(pl.LightningModule):
                  enc_lr=2e-6,
                  total_training_step=500000,
                  warmup_steps=1000,
+                 batch_size=16,
                  **kwargs
                  ):
         super().__init__()
@@ -68,6 +69,7 @@ class SpeechLLMLightning(pl.LightningModule):
         self.finetune_encoder = finetune_encoder and use_audio
         self.use_lora = use_lora
         self.hybrid = False
+        self.batch_size = batch_size
         self.max_processed_length = 10
         if "in_meanpool" in connector_args:
             if "hybrid" in  connector_args:
@@ -92,6 +94,7 @@ class SpeechLLMLightning(pl.LightningModule):
         self.use_embedding_loss = False
         self.num_validation_samples = 5000
         self.use_audio = use_audio
+        self.precomputed_embeddings = ('precomputed' in audio_encoder_name)
 
         self.rouge_scorer = rouge_scorer.RougeScorer(['rouge1', 'rougeL', 'rouge2'], use_stemmer=True)
         # self.bert_scorer = load("bertscore")
@@ -144,10 +147,17 @@ class SpeechLLMLightning(pl.LightningModule):
         #use chunks of size 1min max
         # verbose = mel.shape[1]>60*chunk_size #if more than 60min: check length efficiency
         if verbose: print(f"mel shape = {mel.shape}")
+        
         if self.use_audio:
-            if mel.shape[1]<chunk_size:
+            if self.precomputed_embeddings:
+                speech_embeds, complete_compress = self.pooling(mel)
+                if verbose: print(f"precomputed embs after pooling: {speech_embeds.shape}")
+                speech_embeds = self.connector(speech_embeds)
+                
+            elif mel.shape[1]<chunk_size:
                 _, speech_embeds = self.encode_speech_segment(mel,n_chunks=0, verbose=verbose)
                 speech_embeds, complete_compress = self.pooling(speech_embeds)
+                if verbose: print(f"speech_embeds after pooling: {speech_embeds.shape}")
                 if self.hybrid: speech_embeds = self.short_connector(speech_embeds)
                 else:  speech_embeds = self.connector(speech_embeds)
             else:
@@ -168,7 +178,7 @@ class SpeechLLMLightning(pl.LightningModule):
                 del outs
                 speech_embeds, complete_compress = self.pooling(speech_embeds)
                 speech_embeds = self.connector(speech_embeds)
-            # print(f"output speech embeddings: {speech_embeds.shape}")
+            if verbose: print(f"output speech embeddings: {speech_embeds.shape}")
 
 
         if self.use_lora: embedder = self.llm_model.model.model.embed_tokens
@@ -177,6 +187,7 @@ class SpeechLLMLightning(pl.LightningModule):
         pre_prompt_embeds = embedder(pre_tokenized_ids)
         post_prompt_embeds = embedder(post_tokenized_ids)
         output_prompt_embeds = embedder(output_tokenized_ids)
+        # print(f"pre_prompt_embeds shape: {pre_prompt_embeds.shape}, post_prompt_embeds shape: {post_prompt_embeds.shape}, output_prompt_embeds shape: {output_prompt_embeds.shape}")
 
         cat_embs = [pre_prompt_embeds]
         input_token_length = pre_tokenized_ids.shape[1]
@@ -220,7 +231,7 @@ class SpeechLLMLightning(pl.LightningModule):
         embeds, atts, label_ids, _ = self.encode(mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids, test_mode=False)
         outputs = self.forward(embeds, atts, label_ids)
         loss =  outputs["loss"]
-        self.log("train/loss", loss, on_epoch=True, on_step=False, sync_dist=True)
+        self.log("train/loss", loss, on_epoch=True, on_step=False, sync_dist=True, batch_size=self.batch_size)
         return loss
     
     def validation_step(self, batch, batch_idx):
@@ -228,7 +239,7 @@ class SpeechLLMLightning(pl.LightningModule):
         embeds, atts, label_ids, _ = self.encode(mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids, test_mode=False)
         outputs = self.forward(embeds, atts, label_ids)
         loss = outputs["loss"]
-        self.log("val/loss", loss, on_step=False, on_epoch=True, logger=True, sync_dist=True)
+        self.log("val/loss", loss, on_step=False, on_epoch=True, logger=True, sync_dist=True, batch_size=self.batch_size)
         
         # logits = outputs.logits
         # predicted_ids = torch.argmax(logits, dim=-1).cpu()
@@ -271,7 +282,7 @@ class SpeechLLMLightning(pl.LightningModule):
         extracted_target = self.extract_prediction_values(target_text)
 
         self.get_keys_and_log(extracted_pred, extracted_target,data_names, v='test')
-        self.log(f"test/p_compressed", int(complete_compress), on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+        self.log(f"test/p_compressed", int(complete_compress), on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True, batch_size=self.batch_size)
         generated_output_text = generated_output_text.replace('\n', '')
         # Print everything during testing for further analysis
         logging.info(f"[PREDICTION]\t{extracted_pred}")
@@ -283,8 +294,10 @@ class SpeechLLMLightning(pl.LightningModule):
     
     def get_keys_and_log(self, extracted_pred, extracted_target,data_names, v='val'):
         if len(data_names)==1: v_, v = v, f"{v}/{data_names[0]}"
-
-        else: print(f"longer batchsize detected? data_names={data_names}. keeping v={v}")
+        else: 
+            # print(f"longer batchsize detected? data_names={data_names}. keeping v={v}")
+            if len(set(data_names))==1: v_, v = v, f"{v}/{data_names[0]}"
+            else: v_ = v
         keys = extracted_target.keys()
         pred_keys = extracted_pred.keys()
 
@@ -296,45 +309,45 @@ class SpeechLLMLightning(pl.LightningModule):
             target_transcript = extracted_target['Transcript']
             predicted_transcript = extracted_pred['Transcript']
             wer_metric = wer(target_transcript.lower(), predicted_transcript.lower())
-            self.log(f"{v}/wer", wer_metric, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+            self.log(f"{v}/wer", wer_metric, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True, batch_size=self.batch_size)
 
         if 'Response' in keys:
             target_transcript = extracted_target['Response']
             predicted_transcript = extracted_pred['Response']
             wer_metric = wer(target_transcript.lower(), predicted_transcript.lower())
-            self.log(f"{v}/response_wer", wer_metric, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+            self.log(f"{v}/response_wer", wer_metric, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True, batch_size=self.batch_size)
 
         if 'SpeechActivity' in keys:
             target_isspeech = extracted_target['SpeechActivity']
             predicted_isspeech = extracted_pred['SpeechActivity']
-            self.log(f"{v}/speech_activity", float(target_isspeech.lower()==predicted_isspeech.lower()), on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+            self.log(f"{v}/speech_activity", float(target_isspeech.lower()==predicted_isspeech.lower()), on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True, batch_size=self.batch_size)
 
         if 'Gender' in keys:
             target_gender = extracted_target['Gender']
             predicted_gender = extracted_pred['Gender']
-            self.log(f"{v}/gender", float(target_gender.lower()==predicted_gender.lower()), on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+            self.log(f"{v}/gender", float(target_gender.lower()==predicted_gender.lower()), on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True, batch_size=self.batch_size)
 
         if 'Emotion' in keys:
             target_emotion = extracted_target['Emotion']
             predicted_emotion = extracted_pred['Emotion']
             self.emo_preds.append(predicted_emotion.lower())
             self.emo_targets.append(target_emotion.lower())
-            self.log(f"{v}/emotion", float(target_emotion.lower()==predicted_emotion.lower()), on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+            self.log(f"{v}/emotion", float(target_emotion.lower()==predicted_emotion.lower()), on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True, batch_size=self.batch_size)
 
         if 'Age' in keys:
             target_age = extracted_target['Age']
             predicted_age = extracted_pred['Age']
-            self.log(f"{v}/age", MAE(target_age,predicted_age), on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+            self.log(f"{v}/age", MAE(target_age,predicted_age), on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True, batch_size=self.batch_size    )
 
         if 'Accent' in keys:
             target_accent = extracted_target['Accent']
             predicted_accent = extracted_pred['Accent']
-            self.log(f"{v}/accent", float(target_accent.lower()==predicted_accent.lower()), on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+            self.log(f"{v}/accent", float(target_accent.lower()==predicted_accent.lower()), on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True, batch_size=self.batch_size)
 
         if 'Noises' in keys:
             target_noises = extracted_target['Noises']
             predicted_noises = extracted_pred['Noises']
-            self.log(f"{v}/noises", float(target_noises.lower()==predicted_noises.lower()), on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+            self.log(f"{v}/noises", float(target_noises.lower()==predicted_noises.lower()), on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True, batch_size=self.batch_size)
 
         if 'Summary' in keys:
             target_sum = extracted_target['Summary']
@@ -343,18 +356,18 @@ class SpeechLLMLightning(pl.LightningModule):
             # b_scores = self.bert_scorer.compute(predictions=predicted_sum, references=target_sum, lang="en")
             rouge_avg_f1 = (r_scores['rouge1'].fmeasure + r_scores['rouge2'].fmeasure + r_scores['rougeL'].fmeasure)/3
             if v_=='test':
-                self.log(f"{v}/rouge_1_f1", r_scores['rouge1'].fmeasure, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
-                self.log(f"{v}/rouge_2_f1", r_scores['rouge2'].fmeasure, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
-                self.log(f"{v}/rouge_L_f1", r_scores['rougeL'].fmeasure, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
-                self.log(f"{v}/rouge_1_p", r_scores['rouge1'].precision, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
-                self.log(f"{v}/rouge_2_p", r_scores['rouge2'].precision, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
-                self.log(f"{v}/rouge_L_p", r_scores['rougeL'].precision, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
-                self.log(f"{v}/rouge_1_r", r_scores['rouge1'].recall, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
-                self.log(f"{v}/rouge_2_r", r_scores['rouge2'].recall, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
-                self.log(f"{v}/rouge_L_r", r_scores['rougeL'].recall, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+                self.log(f"{v}/rouge_1_f1", r_scores['rouge1'].fmeasure, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True, batch_size=self.batch_size)
+                self.log(f"{v}/rouge_2_f1", r_scores['rouge2'].fmeasure, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True, batch_size=self.batch_size)
+                self.log(f"{v}/rouge_L_f1", r_scores['rougeL'].fmeasure, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True, batch_size=self.batch_size)
+                self.log(f"{v}/rouge_1_p", r_scores['rouge1'].precision, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True, batch_size=self.batch_size)
+                self.log(f"{v}/rouge_2_p", r_scores['rouge2'].precision, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True, batch_size=self.batch_size)
+                self.log(f"{v}/rouge_L_p", r_scores['rougeL'].precision, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True, batch_size=self.batch_size)
+                self.log(f"{v}/rouge_1_r", r_scores['rouge1'].recall, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True, batch_size=self.batch_size)
+                self.log(f"{v}/rouge_2_r", r_scores['rouge2'].recall, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True, batch_size=self.batch_size)
+                self.log(f"{v}/rouge_L_r", r_scores['rougeL'].recall, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True, batch_size=self.batch_size)
             else:
-                self.log(f"{v}/summary/rouge_avg_f1", rouge_avg_f1,          on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
-                self.log(f"{v_}/summary/rouge_avg_f1", rouge_avg_f1,          on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+                self.log(f"{v}/summary/rouge_avg_f1", rouge_avg_f1,          on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True, batch_size=self.batch_size)
+                self.log(f"{v_}/summary/rouge_avg_f1", rouge_avg_f1,          on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True, batch_size=self.batch_size)
             # self.log(f"{v}/BertScore", b_scores.fmeasure, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
 
     def on_validation_epoch_start(self, n=16):
@@ -366,13 +379,15 @@ class SpeechLLMLightning(pl.LightningModule):
         self.emo_preds, self.emo_targets = [], []
 
     def on_test_epoch_end(self):
-        uar = recall_score(self.emo_targets, self.emo_preds, average='macro')
-        self.log(f"test/uar", uar, prog_bar=True, sync_dist=True)
+        if len(self.emo_targets) > 0:
+            uar = recall_score(self.emo_targets, self.emo_preds, average='macro')
+            self.log(f"test/uar", uar, prog_bar=True, sync_dist=True, batch_size=self.batch_size)
 
     def on_validation_epoch_end(self):
-        uar = recall_score(self.emo_targets, self.emo_preds, average='macro')
-        self.log(f"val/uar", uar, prog_bar=True, sync_dist=True)
-    
+        if len(self.emo_targets) > 0:
+            uar = recall_score(self.emo_targets, self.emo_preds, average='macro')
+            self.log(f"val/uar", uar, prog_bar=True, sync_dist=True, batch_size=self.batch_size)
+        
     def extract_dictionary(self, input_string):
         pattern = r'<s>\s*(\{.*?\})\s*</s>'
         match = re.search(pattern, input_string, re.DOTALL)

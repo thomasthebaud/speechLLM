@@ -42,13 +42,13 @@ class CNNConnector(nn.Module):
         assert len(k)==n_layers
         self.layer = nn.Sequential(
         nn.ReLU(),
-        nn.Conv1d(in_channels, out_channels//2, kernel_size=kernel_size,
+        nn.Conv1d(in_channels, out_channels//4, kernel_size=kernel_size,
                     stride=k[0], padding=2),
         nn.ReLU(),
-        nn.Conv1d(out_channels//2, out_channels, kernel_size=kernel_size,
+        nn.Conv1d(out_channels//4, out_channels//2, kernel_size=kernel_size,
                     stride=k[1], padding=2),
         nn.ReLU(),
-        nn.Conv1d(out_channels, out_channels, kernel_size=kernel_size,
+        nn.Conv1d(out_channels//2, out_channels, kernel_size=kernel_size,
                     stride=k[2], padding=2),
         )
     def forward(self, x):

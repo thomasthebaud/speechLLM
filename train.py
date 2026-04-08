@@ -11,6 +11,7 @@ import torch.utils.data as data_utils
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 import wandb
 import argparse
+from pathlib import Path
 import os
 
 import torch
@@ -18,6 +19,7 @@ from utils import get_model_config
 
 if __name__ == "__main__":
     model_config = get_model_config()
+    os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
     
     wandb.init(project="speechllm", name=model_config['log_path'], group=model_config['group'])
     logger = WandbLogger(project="speechllm", name=model_config['log_path'], group=model_config['group'])
@@ -27,13 +29,16 @@ if __name__ == "__main__":
     model = SpeechLLMLightning(**model_config)
     tokenizer = model.llm_tokenizer
 
+    precomputed_embeddings = ('precomputed' in model_config['audio_encoder_name'])
+
     train_dataset = CompositeAudioDataset(
         list_of_datasets=model_config['train_sets'],
         mode='train', 
         random_keys_prob=0.2,
         max_len=model_config['max_number_seconds'],
         use_text=model_config['use_text'],
-        prob_text=model_config['prob_text']
+        prob_text=model_config['prob_text'],
+        precomputed_embeddings=precomputed_embeddings
         )
 
     val_dataset = CompositeAudioDataset(
@@ -42,7 +47,8 @@ if __name__ == "__main__":
         max_len=model_config['max_number_seconds'],
         max_size=model_config['max_size_per_dev_set'],
         use_text=model_config['use_text'],
-        prob_text=model_config['prob_text']
+        prob_text=model_config['prob_text'],
+        precomputed_embeddings=precomputed_embeddings
         )
 
     print(f"Train set:{len(train_dataset)}, val set:{len(val_dataset)}, batch size:{model_config['batch_size']}")
@@ -91,12 +97,13 @@ if __name__ == "__main__":
                         every_n_epochs=2)
         early_stop_callback = EarlyStopping(monitor="val/loss", min_delta=0.00, patience=10, verbose=False, mode="min")
 
+    
 
     trainer = Trainer(
             max_epochs=model_config['total_training_epoch'], 
             devices=1, accelerator="gpu", 
             strategy=DDPStrategy(find_unused_parameters=True),#model_config['finetune_encoder']
-            limit_train_batches=model_config['train_batch_per_epoch'], 
+            # limit_train_batches=model_config['train_batch_per_epoch'], 
             log_every_n_steps=100, 
             enable_checkpointing=True, 
             enable_progress_bar=True,
@@ -104,5 +111,30 @@ if __name__ == "__main__":
             fast_dev_run=False, logger=logger, 
             accumulate_grad_batches=model_config['grad_accumulate_steps']
     )
-    trainer.fit(model, train_loader, val_loader)
+
+    # Find the latest checkpoint file in the checkpoint directory (prefer last.ckpt but fall back to newest .ckpt)
+
+    ckpt_dir = Path(f"checkpoints/{model_config['group']}/{model_config['model_name']}")
+    ckpt_path = None
+    if ckpt_dir.exists() and ckpt_dir.is_dir():
+        # prefer last.ckpt if present
+        last_ckpt = ckpt_dir / "last.ckpt"
+        if last_ckpt.exists():
+            ckpt_path = str(last_ckpt)
+        else:
+            ckpts = sorted(list(ckpt_dir.glob("*.ckpt")), key=lambda p: p.stat().st_mtime) if any(ckpt_dir.glob("*.ckpt")) else []
+            if len(ckpts) > 0:
+                ckpt_path = str(ckpts[-1])
+
+    if ckpt_path is not None:
+        print(f"Resuming from checkpoint: {ckpt_path}")
+        try:
+            trainer.fit(model, train_loader, val_loader, ckpt_path=ckpt_path)
+        except TypeError:
+            trainer.fit(model, train_loader, val_loader, resume_from_checkpoint=ckpt_path)
+    else:
+        print(f"No checkpoint found in {ckpt_dir}")
+        trainer.fit(model, train_loader, val_loader)
+
+    
 

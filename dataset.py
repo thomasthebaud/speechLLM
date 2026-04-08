@@ -8,6 +8,8 @@ from torchtune.datasets import ConcatDataset
 import pandas as pd
 import random
 import numpy as np
+from pathlib import Path
+from tqdm import tqdm
 
 def make_weighted_sampler_from_dataset(dataset, dtype=torch.double):
     """
@@ -83,34 +85,54 @@ class MyCollator:
 
     def process(self, element):
         waveform, pre_speech_prompt, post_speech_prompt, output_prompt, data_name = element
-
+        
+            
         if waveform is not None:
-            # if "openai/whisper" in self.audio_encoder_name:
-            #     mel = self.wav_2_mel(waveform).unsqueeze(0)
-            # else:
-            mel = self.hubert_processor(waveform.squeeze(), return_tensors="pt", sampling_rate=16000).input_values
+            if 'precomputed' in self.audio_encoder_name: mel = waveform
+            else: mel = self.hubert_processor(waveform.squeeze(), return_tensors="pt", sampling_rate=16000).input_values
         else:
             mel = None
 
         pre_tokenized_ids = self.tokenizer(pre_speech_prompt, padding="do_not_pad", return_tensors='pt', truncation=False, add_special_tokens=False)["input_ids"]
         post_tokenized_ids = self.tokenizer(post_speech_prompt, padding="do_not_pad", return_tensors='pt', truncation=False, add_special_tokens=False)["input_ids"]
         output_tokenized_ids = self.tokenizer(self.tokenizer.bos_token + output_prompt + self.tokenizer.eos_token, padding="do_not_pad", return_tensors='pt', truncation=False, add_special_tokens=False)["input_ids"]
-        
         return mel, pre_tokenized_ids, post_tokenized_ids, output_tokenized_ids, data_name
 
     def pad(self, list_tensors):
-        max_len = np.max([i.shape[1] for i in list_tensors])
-        # print(list_tensors[0].shape)
-        output = torch.zeros((len(list_tensors), max_len))
+        sample = list_tensors[0]
+        # print(type(sample))
+        # try: print(sample.shape)
+        # except: exit(str(sample))
+        
+        # print(max_len)
+        if sample.ndim == 1 or (sample.ndim == 2 and 1 in sample.shape):
+            max_len = max(max(t.shape) for t in list_tensors)
+            output = sample.new_zeros((len(list_tensors), max_len))
 
-        for i,t in enumerate(list_tensors):
-            # print(t.shape, t.squeeze().shape, len(t.squeeze()), output.shape)
-            output[i, :len(t.squeeze())] = t.squeeze() #mono channel only
-        return output
+            for i, tensor in enumerate(list_tensors):
+                if sample.ndim != 1: tensor = tensor.squeeze()
+                try:
+                    output[i, :tensor.shape[0]] = tensor
+                except:
+                    exit(f"tensor shape: {tensor.shape}, output shape: {output.shape}, max_len: {max_len}, sample shape: {sample.shape}")
+            return output
+
+        elif sample.ndim == 2:
+            max_len = max(t.shape[0] for t in list_tensors)
+            feature_dim = sample.shape[1]
+            output = sample.new_zeros((len(list_tensors), max_len, feature_dim))
+
+            for i, tensor in enumerate(list_tensors):
+                output[i, :tensor.shape[0]] = tensor
+            return output
+
+        raise ValueError(f"pad only supports 1D or 2D tensors, got {sample.ndim}D.")
 
 class AudioDataset(Dataset):
-    def __init__(self, csv_file, mode='train',random_keys_prob=0.001, max_len = -1, max_size=-1, fields=[], use_text=False):
+    def __init__(self, csv_file, mode='train',random_keys_prob=0.001, max_len = -1, max_size=-1, fields=[], use_text=False, precomputed_embeddings=False):
         self.data_frame = pd.read_csv(csv_file)
+        self.dataset_name = Path(csv_file).stem
+        self.precomputed_embeddings=precomputed_embeddings
         if max_size>0 and len(self.data_frame) > max_size : self.data_frame = self.data_frame.sample(n=max_size)
         self.data_frame = self.data_frame.sample(frac=1, random_state=42).reset_index(drop=True)
         self.mode = mode
@@ -126,15 +148,20 @@ class AudioDataset(Dataset):
         # dataset_indices = np.array([dataset_to_index[d] for d in datasets])
         # index_to_weight = [len(dataset_indices[dataset_indices==i]) for i in set(dataset_indices)]
         # self.datasets_weights = np.array([len(self.data_frame)/index_to_weight[i] for i in dataset_indices])
+
+        if self.precomputed_embeddings: self.pre_load_embeddings()
         
+    def pre_load_embeddings(self):
+        self.embeddings={}
+        for idx, row in tqdm(self.data_frame.iterrows(), total=len(self.data_frame), desc=f"Pre-loading embeddings for {self.dataset_name}", mininterval=10):
+            audio_path = row['audio_path']
+            emb = self.load_embeddings(audio_path)
+            self.embeddings[audio_path] = emb
+
     def __len__(self):
         return len(self.data_frame)
-    
-    def __getitem__(self, idx):
-        # Load audio
-        audio_row = self.data_frame.iloc[idx]
-        audio_path = audio_row['audio_path']
-        # if self.mode=='test':print(idx, audio_row, audio_path, sep='\t')
+
+    def load_audio(self, audio_path, target_sr=16000):
         if pd.isna(audio_path):
             waveform = None
         elif '.mp3' in audio_path:
@@ -146,7 +173,25 @@ class AudioDataset(Dataset):
         if waveform.shape[1]>self.max_len and self.max_len>0: 
             start = int(np.random.rand(1)*(waveform.shape[1]-self.max_len))
             waveform=waveform[:, start:start+self.max_len]
-            # print(f"DEBUG: shape after truncate: {waveform.shape}")
+        return waveform
+    
+    def load_embeddings(self, base_path):
+        emb_path = f"/export/fs05/tthebau1/EDART/wavlm_base_plus/{self.dataset_name}/{Path(base_path).stem}.npy"
+        emb = torch.from_numpy(np.load(emb_path))
+        return emb
+
+    
+    def __getitem__(self, idx):
+        # Load audio
+        audio_row = self.data_frame.iloc[idx]
+        audio_path = audio_row['audio_path']
+        if self.precomputed_embeddings:
+            # waveform = self.load_embeddings(audio_path)
+            waveform = self.embeddings[audio_path]
+        else:
+            waveform = self.load_audio(audio_path)
+
+
         # # Prepare labels dictionary based on mode and probability
         labels_str = {}
         if self.mode == 'train' and random.random() < self.random_keys_prob:
@@ -181,7 +226,7 @@ class AudioDataset(Dataset):
         return waveform, labels_str, conv_history, transcript
     
 class InstructionalAudioDataset(AudioDataset):
-    def __init__(self, csv_file, mode='train',random_keys_prob=0.001,  max_len = -1, max_size=-1, fields=[], use_text=False, prob_text=0.5, data_name='NaN'):
+    def __init__(self, csv_file, mode='train',random_keys_prob=0.001,  max_len = -1, max_size=-1, fields=[], use_text=False, prob_text=0.5, data_name='NaN', precomputed_embeddings=False):
         """
         Initialize the class with the specified CSV file, mode, and random keys probability.
 
@@ -194,7 +239,7 @@ class InstructionalAudioDataset(AudioDataset):
         self.use_text = use_text
         self.prob_text = prob_text
         self.data_name = data_name
-        super().__init__(csv_file, mode, random_keys_prob=random_keys_prob, max_len = max_len, max_size=max_size, fields=fields, use_text=use_text)
+        super().__init__(csv_file, mode, random_keys_prob=random_keys_prob, max_len = max_len, max_size=max_size, fields=fields, use_text=use_text, precomputed_embeddings=precomputed_embeddings)
         with open("instructions.txt", 'r') as f:
             self.instruction_phrases = f.readlines()
             self.instruction_phrases = [i.strip('\n') for i in self.instruction_phrases if len(i)>5]
@@ -217,7 +262,7 @@ class InstructionalAudioDataset(AudioDataset):
         return waveform, pre_speech_prompt, post_speech_prompt, output_prompt, self.data_name
 
 class CompositeAudioDataset(Dataset):
-    def __init__(self, list_of_datasets, mode='train', random_keys_prob=0.001, max_len = -1, max_size=-1, use_text=False, prob_text=0.5):
+    def __init__(self, list_of_datasets, mode='train', random_keys_prob=0.001, max_len = -1, max_size=-1, use_text=False, prob_text=0.5, precomputed_embeddings=False):
         datasets = []
         for data_name in list_of_datasets:
             data = InstructionalAudioDataset(
@@ -229,7 +274,8 @@ class CompositeAudioDataset(Dataset):
                         fields=list_of_datasets[data_name],
                         use_text=use_text,
                         prob_text=prob_text,
-                        data_name=data_name
+                        data_name=data_name,
+                        precomputed_embeddings=precomputed_embeddings
                         )
             datasets.append(data)
             print(f"Loaded {data_name}, length = {len(data)}")
@@ -241,28 +287,14 @@ class CompositeAudioDataset(Dataset):
             self.len = len(self.dataset)
             self.datasets_weights = np.array([1.0])  # single dataset, weight is 1
         else:
-            # summarize=False
-            # for data_name in list_of_datasets:
-            #     if "summary" in list_of_datasets[data_name]: summarize=True
-            # more than one dataset, use ConcatDataset
             self.dataset = ConcatDataset(datasets)
             self.len = len(self.dataset)
-            # if summarize and mode=='train':
-            #     self.datasets_weights = np.array([0.5 if "summary" in list_of_datasets[data_name] else 0.5/(len(datasets)-1) for data_name in list_of_datasets])
-            #     print(f"Warning: Using unbalanced sampler for {mode} for summarization:\tSets = {list_of_datasets.keys()} \tWeights = {self.datasets_weights}")
-            # else:
-            #     self.datasets_weights = np.array([1/(len(datasets)) for data_name in list_of_datasets])
-            #     print(f"Warning: Using balanced sampler for {mode}:\tSets = {list_of_datasets.keys()} \tWeights = {self.datasets_weights}")
-
             self.datasets_weights = np.array([self.len/len(d) for d in datasets])
             print(f"Weights for {mode}:\tSets = {list_of_datasets.keys()} \tWeights = {self.datasets_weights}")
 
+    def __len__(self):return self.len
 
-    def __len__(self):
-        return self.len
-
-    def __getitem__(self, idx):
-        return self.dataset[idx]
+    def __getitem__(self, idx):return self.dataset[idx]
 
 
 # Example usage
@@ -272,4 +304,3 @@ if __name__ == "__main__":
 
     print(complete_prompt)
     print(waveform)
-

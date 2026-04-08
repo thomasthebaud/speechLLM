@@ -23,8 +23,8 @@ python3 test.py \
     --batch-size 1 \
     --lr 0.0001 \
     --meanpool 10 \
-    --group 'TALSP' \
+    --group 'TASLP_v2' \
     --use-config summarize+multitask_switchboard_librispeech_voxceleb_iemocap_commonvoice.json \
-    --epoch-to-test 189 \
+    --epoch-to-test 43 \
     --nickname "_T.G.A.E.Ac"
 
